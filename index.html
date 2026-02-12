@@ -1324,33 +1324,91 @@ function openReader(bookId) {
     switchView('reader');
 }
 
+/**
+ * 縦書きテキストの描画（目次リンク・字下げ対応版）
+ */
 function renderVerticalText(container, content, illustrations) {
     if (!content) {
         container.innerHTML = '<div class="text-gray-400 p-4">まだ白紙のようです...</div>';
         return;
     }
 
-    const parts = content.split(/\[挿絵:(.+?)\]/g);
     container.innerHTML = '';
     
-    parts.forEach((part, i) => {
-        if (i % 2 === 0) {
-            // Text part
-            const span = document.createElement('span');
-            span.textContent = part;
-            container.appendChild(span);
-        } else {
-            // Illustration ID part
-            const imgData = illustrations?.find(img => img.id === part);
+    // 1. テキストを行ごとに分解
+    const lines = content.split('\n');
+    let htmlContent = '';
+    
+    // 目次エリアかどうかの判定フラグ
+    let inTocArea = false;
+    
+    lines.forEach(line => {
+        const text = line.trim();
+        if (!text) return; // 空行は無視（CSSのマージンで調整するため）
+
+        // --- 挿絵の処理 ---
+        const imgMatch = text.match(/\[挿絵:(.+?)\]/);
+        if (imgMatch) {
+            const imgId = imgMatch[1];
+            const imgData = illustrations?.find(img => img.id === imgId);
             if (imgData) {
-                const div = document.createElement('div');
-                div.className = "vertical-image-container";
-                div.onclick = () => showImagePreview(imgData.data);
-                div.innerHTML = `<img src="${imgData.data}" alt="挿絵">`;
-                container.appendChild(div);
+                htmlContent += `<div class="vertical-image-container"><img src="${imgData.data}"></div>`;
+            }
+            return;
+        }
+
+        // --- 目次・見出しの判定ロジック ---
+        
+        // 「【目次】」という文字を見つけたら目次エリア開始
+        if (text.includes('【目次】') || text.includes('■目次')) {
+            inTocArea = true;
+            htmlContent += `<h3 class="font-bold text-lg mb-4 mt-8">【目次】</h3>`;
+            return;
+        }
+        
+        // 「第1話」などの章タイトルっぽい行
+        // 条件：短い（40文字以下）かつ、「第〇話」や「Chapter」などを含む
+        const isChapterHeader = text.length < 40 && (
+            text.match(/^第[0-9０-９]+[話章]/) || 
+            text.match(/^[Cc]hapter/) || 
+            text.match(/^タイトル[:：]/) ||
+            text.match(/^[0-9]+[話章.]/)
+        );
+
+        // --- 目次リンクの生成 ---
+        if (inTocArea) {
+            // 目次エリア内で、かつ章タイトルっぽい行ならリンクにする
+            // （ただし「第1話 本文」のような見出しが来たら目次エリア終了とみなす）
+            if (text.includes('本文')) {
+                inTocArea = false; // 目次終了
+            }
+            
+            if (inTocArea && isChapterHeader) {
+                // リンク先IDを作成（スペースなどをハイフンに置換）
+                const linkId = "ch-" + text.replace(/\s+/g, '-');
+                htmlContent += `<p class="mb-2"><a onclick="document.getElementById('${linkId}').scrollIntoView({behavior: 'smooth'})" class="toc-link">${text}</a></p>`;
+                return;
             }
         }
+
+        // --- 本文中の章タイトル（ジャンプ先） ---
+        if (isChapterHeader && !inTocArea) {
+            const linkId = "ch-" + text.replace(/\s+/g, '-');
+            htmlContent += `<p id="${linkId}" class="chapter-title">${text}</p>`;
+            return;
+        }
+
+        // --- 通常の本文（字下げ・段落整形） ---
+        // 会話文「」『』などは字下げしない
+        if (text.match(/^[「『（【\[]/)) {
+            htmlContent += `<p class="novel-paragraph" style="text-indent: 0;">${text}</p>`;
+        } else {
+            // それ以外はクラス「novel-paragraph」で一文字下げる
+            htmlContent += `<p class="novel-paragraph">${text}</p>`;
+        }
     });
+    
+    container.innerHTML = htmlContent;
 }
 
 async function handleTTS() {
