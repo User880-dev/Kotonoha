@@ -1071,32 +1071,37 @@ async function handleAIWrite(type) {
     
     showLoading(true);
     try {
-        // AIへの指示（思考ログ禁止・本文のみ）
         let systemPrompt = `あなたはプロの小説家です。
 【重要禁止事項】
-1. 「思考開始」「ユーザーの指示は...」といった思考プロセスは絶対に出力しないでください。
-2. 「はい、書きます」などの返答も不要です。
-3. 出力するのは「小説の本文」のみにしてください。`;
+1. 思考プロセスや「はい、書きます」などの返答は一切出力しないでください。
+2. 小説の本文のみを出力してください。`;
         
         let userPrompt = "";
 
-        // --- A. 新規執筆 ---
+        // --- A. 新規執筆（あらすじ・目次・第1話を作成） ---
         if (type === 'new' && !roadmapInput) {
             let min = 30, max = 60;
             if (scale === 'short') { min = 15; max = 25; }
             if (scale === 'epic') { min = 80; max = 120; }
             const total = Math.floor(Math.random() * (max - min + 1)) + min;
-            
             activeBook.totalChapters = total; 
             activeBook.currentChapter = 1;
 
-            // 設計図作成
-            const roadmap = await generateText(`テーマ: ${promptInput || "王道の物語"}\nジャンル: ${activeBook.genre}\n全${total}話分のリストを作成せよ。`, systemPrompt + "\n指示: 全話の構成案（プロット）を作成してください。");
+            // 設計図（裏設定）を作る
+            const roadmap = await generateText(`テーマ: ${promptInput || "王道の物語"}\nジャンル: ${activeBook.genre}\n全${total}話分のリストを作成せよ。`, "全話の構成案（プロット）を作成してください。リスト形式のみ。");
             document.getElementById('input-roadmap').value = roadmap;
             activeBook.worldSettings = roadmap;
 
-            // 第1話執筆
-            userPrompt = `テーマ: ${promptInput}\n設計図の第1話を約${targetLength}文字で執筆してください。冒頭に「タイトル: [作品名]」を書いてください。`;
+            // ★ここがポイント：あらすじと目次を要求するが、整形はしない
+            userPrompt = `テーマ: ${promptInput}\n
+以下の構成で、物語の冒頭部分を執筆してください。
+
+1. 【タイトル】（一行目に書く）
+2. 【あらすじ】（物語の概要を200文字程度で）
+3. 【目次】（全${total}話のうち、第1話〜第5話までの予定タイトルをリストアップ。「・第1話 タイトル」の形式で）
+4. 【第1話 本文】（ここから物語を書き始める。約${targetLength}文字）
+
+思考ログは不要です。出力されたものがそのまま本になります。`;
         } 
         // --- B. 続きを書く ---
         else {
@@ -1104,37 +1109,22 @@ async function handleAIWrite(type) {
             const remaining = activeBook.totalChapters - activeBook.currentChapter;
             systemPrompt += `\n現在の状況: 全${activeBook.totalChapters}話中の第${activeBook.currentChapter}話。\n【設計図】\n${roadmapInput}`;
             if (remaining <= 0) systemPrompt += "\n【重要】これが最終回です。完結させてください。";
+            
             userPrompt = `直近の続きから、設計図の第${activeBook.currentChapter}話を約${targetLength}文字で描写してください。`;
         }
 
         let text = await generateText(userPrompt, systemPrompt);
         
-        // ★ここからが「美しい整形」の魔法です！
-        
-        // 1. タイトル処理（新規作成時のみ）
+        // タイトル処理（新規時）
         if (type === 'new') {
-            const titleMatch = text.match(/タイトル[:：]\s*(.+)/);
+            const titleMatch = text.match(/【?タイトル】?[:：]?\s*(.+)/);
             if (titleMatch) {
                 activeBook.title = titleMatch[1].trim();
-                text = text.replace(titleMatch[0], '').trim(); // 本文からタイトル行を削除
                 document.getElementById('input-book-title').value = activeBook.title;
             }
-        }
-
-        // 2. 自動整形（字下げ・空行）
-        // 文頭の字下げ：全角スペースがない段落の先頭に全角スペースを追加（「」で始まる会話文は除く）
-        text = text.split('\n').map(line => {
-            line = line.trim();
-            if (!line) return ''; // 空行はそのまま
-            if (line.match(/^[「『（]/)) return line; // 会話文などは字下げしない
-            return '　' + line; // それ以外は全角スペースを一文字入れる
-        }).join('\n\n'); // 段落の間には空行を挟んで読みやすくする
-
-        // 3. 本文への追加
-        if (type === 'new') {
             activeBook.content = text;
         } else {
-            // 続きを書く場合も、前の文章との間に空行を入れて結合
+            // 続きを書く場合は改行して追加
             activeBook.content += "\n\n" + text;
         }
         
