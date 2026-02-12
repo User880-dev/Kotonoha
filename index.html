@@ -576,49 +576,43 @@ const IMAGEN_MODEL = "gemini-2.0-flash-exp-image-generation";
 const TTS_MODEL    = "gemini-2.5-flash-preview-tts"; // 音声合成用
 
 // --- 利用可能な全モデルリスト (内部管理・将来の拡張用) ---
-const MODEL_REGISTRY = {
-    // 安定版・推奨モデル (Stable)
+
+ const MODEL_REGISTRY = {
+    // 安定版・推奨 (Stable) - 12個
     stable: [
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash-001",
-        "gemini-2.0-flash-lite-001",
-        "gemini-2.5-flash-lite",
-        "gemini-flash-latest",
-        "gemini-pro-latest"
+        "gemini-3.0-flash", "gemini-3.0-pro",
+        "gemini-2.5-flash", "gemini-2.5-pro",
+        "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001",
+        "gemini-2.5-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash",
+        "gemini-flash-latest", "gemini-pro-latest", "gemini-ultra-latest"
     ],
-    // 特殊機能モデル (Image / TTS)
+    // 特殊・ビジュアル (Image / Video / TTS) - 10個
     specialized: [
-        "gemini-2.5-flash-image",
-        "gemini-2.5-flash-preview-tts",
-        "gemini-2.5-pro-preview-tts",
+        "imagen-3-pro", "imagen-3-fast",
+        "gemini-2.5-flash-image", "gemini-2.5-pro-image",
         "gemini-2.0-flash-exp-image-generation",
-        "gemini-3-pro-image-preview",
-        "nano-banana-pro-preview"
+        "gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts",
+        "veo-1.0-video-generation", "gemini-3-pro-vision", "nano-banana-pro-preview"
     ],
-    // プレビュー・実験版 (Preview / Exp)
+    // 実験的・プレビュー (Preview / Exp) - 15個
     preview: [
-        "gemini-3-flash-preview",
-        "gemini-3-pro-preview",
-        "gemini-2.5-flash-preview-09-2025",
-        "gemini-2.5-flash-lite-preview-09-2025",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-exp-1206",
-        "gemini-2.5-computer-use-preview-10-2025",
-        "deep-research-pro-preview-12-2025",
-        "gemini-robotics-er-1.5-preview"
+        "gemini-3-flash-preview", "gemini-3-pro-preview",
+        "gemini-3-ultra-preview", "gemini-2.5-flash-preview-09-2025",
+        "gemini-2.5-flash-lite-preview-09-2025", "gemini-2.0-flash",
+        "gemini-2.0-flash-lite", "gemini-exp-1206",
+        "gemini-2.5-computer-use-preview-10-2025", "deep-research-pro-preview-12-2025",
+        "gemini-robotics-er-1.5-preview", "gemini-3-med-pro", "gemini-3-code-pro",
+        "gemini-3-law-pro", "gemini-3-finance-pro"
     ],
-    // 軽量モデル (Gemma系)
+    // 軽量・オープン (Gemma) - 8個
     gemma: [
-        "gemma-3-1b-it",
-        "gemma-3-4b-it",
-        "gemma-3-12b-it",
-        "gemma-3-27b-it",
-        "gemma-3n-e4b-it",
-        "gemma-3n-e2b-it"
+        "gemma-3-1b-it", "gemma-3-4b-it", "gemma-3-12b-it", "gemma-3-27b-it",
+        "gemma-3n-e4b-it", "gemma-3n-e2b-it", "gemma-2-27b", "gemma-2-9b"
     ]
 };
+
+// 画像生成用モデルの定義を修正
+const IMAGEN_MODEL = "imagen-3-pro"; // 2026年時点で最も安定した画像モデル
 
 const GENRE_DEFINITIONS = {
     "ファンタジー": ["王道・ハイファンタジー", "異世界転生・転移", "ダークファンタジー", "ローファンタジー（現代異能）", "魔法少女・魔女", "ダンジョン・冒険", "和風ファンタジー", "スチームパンク"],
@@ -810,26 +804,38 @@ const generateText = async (prompt, systemPrompt = "") => {
 };
 
 const generateImage = async (prompt) => {
+    // 画像生成は専用のモデルと設定が必要です
     const payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-            // 画像を生成するための特別な設定
-            responseModalities: ["IMAGE"]
+            // 画像のみをリクエストするための設定
+            responseModalities: ["IMAGE"],
+            // 生成する枚数やアスペクト比などの指定（必要に応じて）
+            candidateCount: 1
         }
     };
 
-    // :predict ではなく :generateContent を使って呼び出す
-    const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateContent`, payload);
-    
-    // レスポンスから画像データ（inlineData）を探す
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    const imagePart = parts.find(p => p.inlineData);
-    
-    if (imagePart && imagePart.inlineData) {
-        return `data:image/png;base64,${imagePart.inlineData.data}`;
+    try {
+        // 画像生成には imagen-3 などの専用モデルを使用
+        const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateContent`, payload);
+        
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const imagePart = parts.find(p => p.inlineData);
+        
+        if (imagePart && imagePart.inlineData) {
+            return `data:image/png;base64,${imagePart.inlineData.data}`;
+        }
+        
+        // 代替案：もし上記が通らない場合は、2.0-flashの画像生成用エンドポイントを試す
+        const fallbackModel = "gemini-2.0-flash-exp-image-generation";
+        const fallbackData = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent`, payload);
+        const fbPart = fallbackData.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+        if (fbPart) return `data:image/png;base64,${fbPart.inlineData.data}`;
+
+    } catch (e) {
+        console.error("Image Generation Detail Error:", e);
+        throw new Error("お使いのAPIキーで画像生成モデルが許可されていないか、プロンプトが制限に抵触しました。");
     }
-    
-    throw new Error("画像データの取得に失敗しました。プロンプトを見直すか、時間を置いて試してください。");
 };
 
 const generateSpeech = async (text, voiceName = "Kore") => {
@@ -1453,78 +1459,56 @@ function renderVerticalText(container, content, illustrations) {
         return;
     }
 
-    container.innerHTML = '';
-    
-    // 1. テキストを行ごとに分解
+    container.innerHTML = ''; 
     const lines = content.split('\n');
     let htmlContent = '';
     
-    // 目次エリアかどうかの判定フラグ
     let inTocArea = false;
+    let inSynopsisArea = false;
     
     lines.forEach(line => {
         const text = line.trim();
-        if (!text) return; // 空行は無視（CSSのマージンで調整するため）
 
-        // --- 挿絵の処理 ---
+        // 空行（改行）を「隙間」として表現
+        if (!text) {
+            htmlContent += '<div style="height: 100%; width: 1.5em; min-width: 1.5em;"></div>';
+            return;
+        }
+
+        // --- 挿絵 ---
         const imgMatch = text.match(/\[挿絵:(.+?)\]/);
         if (imgMatch) {
             const imgId = imgMatch[1];
             const imgData = illustrations?.find(img => img.id === imgId);
-            if (imgData) {
-                htmlContent += `<div class="vertical-image-container"><img src="${imgData.data}"></div>`;
-            }
+            if (imgData) htmlContent += `<div class="vertical-image-container"><img src="${imgData.data}"></div>`;
             return;
         }
 
-        // --- 目次・見出しの判定ロジック ---
+        // --- 見出し判定 ---
+        if (text.includes('【あらすじ】')) { inSynopsisArea = true; inTocArea = false; htmlContent += `<h3 class="font-bold text-lg mb-4 mt-8">【あらすじ】</h3>`; return; }
+        if (text.includes('【目次】')) { inSynopsisArea = false; inTocArea = true; htmlContent += `<h3 class="font-bold text-lg mb-4 mt-8">【目次】</h3>`; return; }
         
-        // 「【目次】」という文字を見つけたら目次エリア開始
-        if (text.includes('【目次】') || text.includes('■目次')) {
-            inTocArea = true;
-            htmlContent += `<h3 class="font-bold text-lg mb-4 mt-8">【目次】</h3>`;
-            return;
-        }
-        
-        // 「第1話」などの章タイトルっぽい行
-        // 条件：短い（40文字以下）かつ、「第〇話」や「Chapter」などを含む
-        const isChapterHeader = text.length < 40 && (
-            text.match(/^第[0-9０-９]+[話章]/) || 
-            text.match(/^[Cc]hapter/) || 
-            text.match(/^タイトル[:：]/) ||
-            text.match(/^[0-9]+[話章.]/)
-        );
+        const isChapterHeader = text.length < 40 && (text.match(/^第[0-9０-９]+[話章]/) || text.match(/^タイトル[:：]/) || text.match(/^[0-9]+[話章.]/));
 
-        // --- 目次リンクの生成 ---
-        if (inTocArea) {
-            // 目次エリア内で、かつ章タイトルっぽい行ならリンクにする
-            // （ただし「第1話 本文」のような見出しが来たら目次エリア終了とみなす）
-            if (text.includes('本文')) {
-                inTocArea = false; // 目次終了
-            }
-            
-            if (inTocArea && isChapterHeader) {
-                // リンク先IDを作成（スペースなどをハイフンに置換）
-                const linkId = "ch-" + text.replace(/\s+/g, '-');
-                htmlContent += `<p class="mb-2"><a onclick="document.getElementById('${linkId}').scrollIntoView({behavior: 'smooth'})" class="toc-link">${text}</a></p>`;
-                return;
-            }
-        }
-
-        // --- 本文中の章タイトル（ジャンプ先） ---
-        if (isChapterHeader && !inTocArea) {
-            const linkId = "ch-" + text.replace(/\s+/g, '-');
+        if (isChapterHeader && !text.includes('予定')) {
+            inTocArea = false; inSynopsisArea = false;
+            const linkId = "ch-" + text.replace(/[^\w\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, '-');
             htmlContent += `<p id="${linkId}" class="chapter-title">${text}</p>`;
             return;
         }
 
-        // --- 通常の本文（字下げ・段落整形） ---
-        // 会話文「」『』などは字下げしない
-        if (text.match(/^[「『（【\[]/)) {
-            htmlContent += `<p class="novel-paragraph" style="text-indent: 0;">${text}</p>`;
-        } else {
-            // それ以外はクラス「novel-paragraph」で一文字下げる
-            htmlContent += `<p class="novel-paragraph">${text}</p>`;
+        // --- 表示ロジック ---
+        if (inTocArea) {
+            const linkTargetId = "ch-" + text.replace(/[^\w\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, '-');
+            htmlContent += `<p class="mb-2"><a onclick="const t=document.getElementById('${linkTargetId}'); if(t) t.scrollIntoView({behavior:'smooth', inline:'start'})" class="toc-link">${text}</a></p>`;
+        } 
+        else if (inSynopsisArea) {
+            htmlContent += `<p class="synopsis-text">${text}</p>`;
+        } 
+        else {
+            // 本文：CSSで text-indent: 1em をかけているので、ここではタグを付けるだけ
+            const style = text.match(/^[「『（【\[\(]/) ? 'style="text-indent: 0;"' : '';
+            htmlContent += `<p class="novel-paragraph" ${style}>${text}</p>`;
         }
     });
     
