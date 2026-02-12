@@ -451,10 +451,9 @@ let apiKey = localStorage.getItem('kotonoha_api_key') || "";
 
 // --- メインで使用するモデル (エラー時はここを書き換えてください) ---
 // 2.5 Flashは2025年6月リリースの安定版で、無料枠でも動作しやすいため第一候補にします。
-// --- モデル設定 ---
-const GEMINI_MODEL = "gemini-2.5-flash"; // 執筆用
-const IMAGEN_MODEL = "gemini-3-pro-image-preview"; // ★診断リストにあった最新モデルに変更
-const TTS_MODEL    = "gemini-2.5-flash-preview-tts"; // 音声用
+const GEMINI_MODEL = "gemini-2.5-flash"; 
+const IMAGEN_MODEL = "gemini-2.0-flash-exp-image-generation"; 
+const TTS_MODEL    = "gemini-2.5-flash-preview-tts"; // 音声合成用
 
 // --- 利用可能な全モデルリスト (内部管理・将来の拡張用) ---
 const MODEL_REGISTRY = {
@@ -690,32 +689,14 @@ const generateText = async (prompt, systemPrompt = "") => {
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 };
 
-/**
- * 画像生成関数 (最新の Gemini Image Generation モデル対応版)
- */
 const generateImage = async (prompt) => {
     const payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
+            // 画像を生成するための特別な設定
             responseModalities: ["IMAGE"]
         }
     };
-
-    try {
-        const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateContent`, payload);
-        
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        const imagePart = parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith('image/'));
-        
-        if (imagePart && imagePart.inlineData) {
-            return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
-        }
-        throw new Error("画像データが見つかりません");
-    } catch (e) {
-        console.error("Image Gen Error:", e);
-        throw e;
-    }
-};
 
     // :predict ではなく :generateContent を使って呼び出す
     const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateContent`, payload);
