@@ -1,0 +1,19 @@
+{
+  "short_name": "言の葉",
+  "name": "言の葉 - Kotonoha 文芸アプリ",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3532/3532353.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "display": "standalone",
+  "theme_color": "#4f46e5",
+  "background_color": "#fdfbf7",
+  "lang": "ja",
+  "description": "AIと共に物語を紡ぎ、美しい縦書きで読書を楽しむ"
+}
+
