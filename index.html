@@ -9,40 +9,80 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     
+    <!-- CSS読み込み -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css" />
 
-    <!-- Reactをブラウザでそのまま動かすための設定 -->
+    <!-- 画面上エラー表示用スタイル -->
+    <style>
+        #debug-console {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: rgba(0,0,0,0.8);
+            color: #ff5555;
+            font-family: monospace;
+            font-size: 10px;
+            padding: 10px;
+            z-index: 9999;
+            display: none;
+            max-height: 50vh;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+
+    <!-- ライブラリの読み込み設定 (ESM) -->
     <script type="importmap">
     {
         "imports": {
-            "react": "https://esm.sh/react@18.2.0?dev",
-            "react-dom": "https://esm.sh/react-dom@18.2.0?dev",
-            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?dev",
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom": "https://esm.sh/react-dom@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
             "lucide-react": "https://esm.sh/lucide-react@0.284.0"
         }
     }
     </script>
-    <!-- JSXをブラウザで変換するライブラリ -->
+    
+    <!-- JSXをブラウザで変換するためのBabel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
+    <!-- エラーが出た時だけ表示されるコンソール -->
+    <div id="debug-console"></div>
     <div id="root"></div>
 
-    <!-- type="text/babel" にすることでJSXを解釈させます -->
+    <script>
+        // iPhoneの画面にエラーを表示するための仕組み
+        window.onerror = function(msg, url, line, col, error) {
+            const consoleDiv = document.getElementById('debug-console');
+            consoleDiv.style.display = 'block';
+            consoleDiv.innerText += `\nERROR: ${msg}\nLINE: ${line}\nURL: ${url}\n`;
+            return false;
+        };
+    </script>
+
+    <!-- メインプログラムの読み込み -->
     <script type="text/babel" data-type="module">
         import React from 'react';
         import { createRoot } from 'react-dom/client';
         import App from './App.jsx';
 
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
+        try {
+            const root = createRoot(document.getElementById('root'));
+            root.render(<App />);
+            console.log("React Rendered Successfully");
+        } catch (err) {
+            window.onerror(err.message, "main-script", 0, 0, err);
+        }
     </script>
 
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(() => {});
+                navigator.serviceWorker.register('sw.js').catch(err => {
+                    console.error('SW Error:', err);
+                });
             });
         }
     </script>
