@@ -1005,21 +1005,28 @@ async function handleAIWrite(type) {
     const prompt = document.getElementById('input-ai-prompt').value;
     const mainG = document.getElementById('select-genre-main').value;
     const subG = document.getElementById('select-genre-sub').value;
+    
+    // ★追加したセレクトボックスから「執筆量」を取得します
+    const targetLength = document.getElementById('select-pages').value;
+    
     const genreText = subG ? `${mainG}（${subG}）` : mainG;
     activeBook.genre = genreText;
 
     showLoading(true);
     try {
         let systemPrompt = "あなたはプロの小説家です。美しい日本語で、感情豊かに物語を書いてください。出力はMarkdownではなくプレーンテキストで。";
+        // ★AIに「この文字数で書いてね」というルールを伝えます
+        systemPrompt += `\n指示された文字数（約${targetLength}文字）を厳守してください。`;
+
         if (activeBook.characters.length > 0) systemPrompt += `\n\n【登場人物設定】\n${JSON.stringify(activeBook.characters)}`;
         if (activeBook.worldSettings) systemPrompt += `\n\n【世界観】\n${activeBook.worldSettings}`;
 
         let userPrompt = "";
         if (type === 'new') {
-            userPrompt = `ジャンル「${genreText}」で、次の要素を含む物語の冒頭を書いてください: ${prompt}。タイトルも提案してください（形式: タイトル: [タイトル]）。`;
+            userPrompt = `ジャンル「${genreText}」で、次の要素を含む物語の冒頭を、約${targetLength}文字で書いてください: ${prompt}。タイトルも提案してください（形式: タイトル: [タイトル]）。`;
         } else {
             systemPrompt += " 既存の物語の続きを書いてください。";
-            userPrompt = `これまでのあらすじ（直近）:\n${activeBook.content.slice(-1500)}\n\n指示: 続きを書いてください。展開案: ${prompt}`;
+            userPrompt = `これまでのあらすじ（直近）:\n${activeBook.content.slice(-1500)}\n\n指示: 続きを約${targetLength}文字で書いてください。展開案: ${prompt}`;
         }
 
         const text = await generateText(userPrompt, systemPrompt);
@@ -1039,7 +1046,7 @@ async function handleAIWrite(type) {
         
         document.getElementById('textarea-content').value = activeBook.content;
         saveData();
-        switchWriterTab('write'); // Editorへ戻る
+        switchWriterTab('write'); 
     } catch (e) {
         showError(e.message);
     } finally {
