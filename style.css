@@ -1,111 +1,271 @@
-/* --- 1. 基本設定とフォント --- */
+/* --- 1. グローバル設定 & リセット --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent; /* スマホのタップ青枠を消す */
+}
+
+:root {
+    --indigo-primary: #4f46e5;
+    --paper-bg: #fdfbf7;
+    --text-main: #1a1a1a;
+    --text-muted: #6b7280;
+    --safe-bottom: env(safe-area-inset-bottom, 20px);
+}
+
 body {
     font-family: 'Shippori Mincho', 'Times New Roman', serif;
-    touch-action: manipulation;
-    -webkit-font-smoothing: antialiased;
-    overscroll-behavior-y: none;
     background-color: #f3f4f6;
+    color: var(--text-main);
+    line-height: 1.6;
+    overflow: hidden; /* アプリ全体のスクロールはJSと特定エリアで制御 */
+    width: 100%;
+    height: 100vh;
+    /* iOSの引っ張り更新などを抑制 */
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* スクロールバー非表示（アプリ風） */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* --- 2. スクロールバーのカスタマイズ（スマホ・デスクトップ共通） --- */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
 
-/* --- 2. 縦書きと小説レイアウト --- */
+/* --- 3. アプリ全体のコンテナ --- */
+#app-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 背景レイヤー：幻想的な雰囲気を作る */
+#bg-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-size: cover;
+    background-position: center;
+    transition: opacity 0.8s ease-in-out;
+    filter: brightness(0.9);
+}
+
+/* 各画面（セクション）の基本設定 */
+.view-section {
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- 4. ガラスのような質感（Glassmorphism） --- */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+/* --- 5. 縦書き（縦組）の基本定義 --- */
 .writing-vertical-rl {
+    /* 縦書き、右から左へ */
     writing-mode: vertical-rl;
     -webkit-writing-mode: vertical-rl;
+    /* 英数字を縦書きの中で正立させる */
     text-orientation: upright;
     -webkit-text-orientation: upright;
+    /* フォントの最適化 */
+    font-feature-settings: "palt"; /* プロポーショナルメトリクス */
 }
 
-/* 小説の本文：1文字下げ・読みやすい行間 */
+/* 小説の本文エリア */
 .novel-paragraph {
-    text-indent: 1em;    /* 文頭の1文字下げ */
-    line-height: 2.2;    /* ゆったりした行間 */
-    margin-left: 0.8em;  /* 段落ごとの隙間（縦書きなので左側） */
-    text-align: justify; /* 文字の端を揃える */
+    /* 日本語の伝統的な1文字下げ */
+    text-indent: 1em;
+    /* 読み疲れを防ぐ広めの行間 */
+    line-height: 2.2;
+    /* 段落間の余白（縦書きなので「左側」に隙間を作る） */
+    margin-left: 0.8em;
+    /* 均等割付で文字の端を揃える */
+    text-align: justify;
+    word-break: break-all;
+    font-size: 1.1rem;
 }
 
-/* 目次リンク：青色でタップ可能 */
+/* 会話文「」などの場合は字下げをキャンセルする設定（JS側で制御） */
+.novel-paragraph.no-indent {
+    text-indent: 0;
+}
+
+/* 章・話のタイトル */
+.chapter-title {
+    font-weight: 700;
+    font-size: 1.5rem;
+    /* 縦書きでの位置調整：前の章から大きく離す */
+    margin-left: 4em; 
+    margin-right: 2em;
+    color: var(--text-main);
+    display: inline-block;
+    border-left: 1px solid rgba(0,0,0,0.1); /* 縦書きの「下線」に相当 */
+    padding-left: 0.5em;
+}
+
+/* あらすじ（要約）のスタイル */
+.synopsis-text {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    line-height: 2;
+    margin-left: 1.5em;
+    /* 少し斜体にするなど、本文と区別 */
+    font-style: normal;
+    border-left: 2px solid #e5e7eb;
+    padding-left: 1em;
+}
+
+/* 目次内のリンク装飾 */
 .toc-link {
-    color: #4f46e5;
+    color: var(--indigo-primary);
     text-decoration: none;
     border-bottom: 1px dashed #a5b4fc;
     cursor: pointer;
-    padding: 4px 0;
+    padding-bottom: 4px;
     display: inline-block;
+    transition: all 0.2s ease;
 }
 
-/* 章タイトル */
-.chapter-title {
-    font-weight: bold;
-    font-size: 1.3em;
-    margin: 3em 0 2em 0;
-    color: #1a1a1a;
+.toc-link:active {
+    opacity: 0.6;
+    transform: scale(0.98);
+}
+/* --- 6. アニメーション定義（動きの演出） --- */
+
+/* 右からスライドイン（チャットやモーダル用） */
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
 }
 
-/* あらすじエリア */
-.synopsis-text {
-    font-size: 0.95em;
-    color: #4b5563;
-    line-height: 1.8;
-    margin-left: 1em;
+/* ふわっと表示 */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- 3. アニメーション --- */
-@keyframes slideInRight { 
-    from { transform: translateX(100%); opacity: 0; } 
-    to { transform: translateX(0); opacity: 1; } 
-}
-@keyframes fadeIn { 
-    from { opacity: 0; } 
-    to { opacity: 1; } 
-}
-@keyframes spin { 
-    from { transform: rotate(0deg); } 
-    to { transform: rotate(360deg); } 
+/* ぐるぐる回転（読み込み中アイコン用） */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
-.animate-slide-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.animate-fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
-.animate-spin { animation: spin 1s linear infinite; }
-
-/* --- 4. コンポーネント装飾 --- */
-.glass-panel {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+/* アニメーション用クラス */
+.animate-slide-in { 
+    animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+}
+.animate-fade-in { 
+    animation: fadeIn 0.4s ease-out forwards; 
+}
+.animate-spin { 
+    animation: spin 1s linear infinite; 
 }
 
+/* --- 7. 特殊コンポーネントの装飾 --- */
+
+/* 本のカバー：タップした時に少し沈む演出 */
 .book-cover-hover {
     transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
-.book-cover-hover:active { transform: scale(0.95); }
+.book-cover-hover:active {
+    transform: scale(0.96) translateY(2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
 
-/* 縦書きモード時の画像コンテナ */
+/* 縦書きモードの中の「画像（挿絵）」設定 */
 .vertical-image-container {
+    /* 画像は横向きのまま表示されるように戻す */
     writing-mode: horizontal-tb;
-    margin: 1rem 0.5rem;
+    margin: 2rem 1rem;
     display: inline-block;
     vertical-align: middle;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    background: white;
-    padding: 8px;
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.vertical-image-container img {
+    max-width: 70vw;  /* スマホの横幅に合わせる */
+    max-height: 60vh; /* 高すぎないように制限 */
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+/* --- 8. スマホ セーフエリア対応 --- */
+/* iPhoneのノッチや下のバーに重ならないようにする */
+.safe-area-pb {
+    padding-bottom: calc(var(--safe-bottom) + 10px);
+}
+.safe-area-pt {
+    padding-top: env(safe-area-inset-top, 20px);
+}
+/* --- 9. タブ切り替えの視覚効果 --- */
+/* アクティブなタブと非アクティブなタブの色の変化を滑らかに */
+#tab-btn-write, #tab-btn-preview, #tab-btn-tools {
+    transition: color 0.3s ease, transform 0.2s ease;
+}
+
+/* --- 10. 読者チャットの吹き出しデザイン --- */
+#chat-messages > div {
+    position: relative;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+    border-radius: 18px;
+    line-height: 1.5;
+}
+
+/* ユーザーの吹き出し（右側） */
+.bg-indigo-100 {
+    border-bottom-right-radius: 4px !important;
+    background-color: #e0e7ff;
+    color: #3730a3;
+}
+
+/* AIの吹き出し（左側） */
+.bg-gray-100 {
+    border-bottom-left-radius: 4px !important;
+    background-color: #f3f4f6;
+    color: #1f2937;
     border: 1px solid #e5e7eb;
 }
-.vertical-image-container img { 
-    max-width: 60vw; 
-    max-height: 50vh; 
-    object-fit: contain; 
+
+/* --- 11. ツールパネル内のボタン調整 --- */
+#tool-panel-ai section, #tool-panel-settings section {
+    animation: fadeIn 0.4s ease-out;
 }
 
-/* スマホ セーフエリア対応 */
-.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 20px); }
-.safe-area-pt { padding-top: env(safe-area-inset-top, 20px); }
+/* セレクトボックスのスマホ最適化 */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1.2em;
+    padding-right: 2rem !important;
+}
 
-/* 画面切り替えの基本設定 */
-.view-section {
-    transition: opacity 0.3s ease;
+/* --- 12. ローディング・オーバーレイの磨き込み --- */
+#loading-overlay {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* テキストエリアのフォント調整 */
+textarea {
+    font-variant-ligatures: normal;
 }
