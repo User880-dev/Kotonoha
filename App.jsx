@@ -1,60 +1,64 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Library, Key, PenTool, Settings, 
-  Dice5, X, ChevronRight, Plus, AlertCircle 
-} from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { generateId } from './utils.js';
 
 /**
  * App Component
- * アプリ全体の画面遷移とデータ管理を担当します
  */
 export default function App() {
+  // --- アイコンの取得 ---
+  const { 
+    Library, Key, PenTool, Settings, 
+    Dice5, X, Plus, AlertCircle 
+  } = LucideIcons;
+
   // --- 状態管理 (State) ---
-  const [view, setView] = useState('auth'); // 現在の画面 (auth | library | editor | reader)
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || "");
+  const [view, setView] = useState('auth'); 
+  const [apiKey, setApiKey] = useState("");
   const [books, setBooks] = useState([]);
   const [activeBookId, setActiveBookId] = useState(null);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [appReady, setAppReady] = useState(false);
 
   // --- 初期化 (Effect) ---
   useEffect(() => {
-    // 保存された本のデータを読み込み
-    const savedBooks = localStorage.getItem('kotonoha_books');
-    if (savedBooks) {
-      try {
+    // データの読み込み
+    try {
+      const savedBooks = localStorage.getItem('kotonoha_books');
+      if (savedBooks) {
         setBooks(JSON.parse(savedBooks));
-      } catch (e) {
-        console.error("データの読み込みに失敗しました", e);
       }
+      
+      const savedKey = localStorage.getItem('gemini_api_key');
+      if (savedKey) {
+        setApiKey(savedKey);
+        setView('library');
+      }
+    } catch (e) {
+      console.error("Data load error", e);
     }
-
-    // APIキーがあれば書庫へ
-    if (apiKey) {
-      setView('library');
-    }
+    setAppReady(true);
   }, []);
 
-  // データ保存の監視
+  // データ保存
   useEffect(() => {
-    localStorage.setItem('kotonoha_books', JSON.stringify(books));
-  }, [books]);
+    if (appReady) {
+      localStorage.setItem('kotonoha_books', JSON.stringify(books));
+    }
+  }, [books, appReady]);
 
   useEffect(() => {
-    localStorage.setItem('gemini_api_key', apiKey);
-  }, [apiKey]);
-
-  // 現在選択中の本
-  const activeBook = useMemo(() => 
-    books.find(b => b.id === activeBookId), 
-    [books, activeBookId]
-  );
+    if (appReady) {
+      localStorage.setItem('gemini_api_key', apiKey);
+    }
+  }, [apiKey, appReady]);
 
   // --- アクション ---
   const saveKey = (key) => {
-    if (key.trim()) {
-      setApiKey(key.trim());
+    const trimmedKey = key.trim();
+    if (trimmedKey) {
+      setApiKey(trimmedKey);
       setView('library');
     }
   };
@@ -75,14 +79,14 @@ export default function App() {
   };
 
   const deleteBook = (id) => {
-    if (confirm("この物語を永遠に葬りますか？")) {
+    if (window.confirm("この物語を永遠に葬りますか？")) {
       setBooks(books.filter(b => b.id !== id));
     }
   };
 
-  // --- 画面レンダリング ---
+  // --- サブビュー ---
 
-  /** 1. 認証画面 (Auth) */
+  /** 認証画面 */
   const AuthView = () => (
     <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-6 animate-in">
       <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center">
@@ -96,19 +100,19 @@ export default function App() {
         <input 
           type="password" 
           placeholder="APIキーを貼り付け" 
-          className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl mb-4 text-center focus:ring-2 focus:ring-indigo-300 outline-none transition-all"
+          className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl mb-4 text-center focus:ring-2 focus:ring-indigo-300 outline-none"
           onBlur={(e) => saveKey(e.target.value)}
         />
-        <p className="text-[10px] text-gray-400">※入力後に枠の外をタップすると確定します</p>
+        <p className="text-[10px] text-gray-400">※入力後に枠の外をタップして確定してください</p>
       </div>
     </div>
   );
 
-  /** 2. 書庫画面 (Library) */
+  /** 書庫画面 */
   const LibraryView = () => (
-    <div className="min-h-screen bg-gray-100 safe-area-pt pb-24 animate-in">
+    <div className="min-h-screen bg-gray-100 pb-24 animate-in">
       <div className="p-6 max-w-6xl mx-auto">
-        <header className="flex justify-between items-center mb-10 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm sticky top-4 z-10">
+        <header className="flex justify-between items-center mb-10 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm sticky top-4 z-10 safe-area-pt">
           <h1 className="text-2xl font-serif font-bold text-gray-800 flex items-center gap-2">
             <Library className="text-indigo-600" />言の葉書庫
           </h1>
@@ -121,16 +125,14 @@ export default function App() {
         </header>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {/* 新規作成カード */}
           <div 
             onClick={createNewBook}
-            className="aspect-[2/3] border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-white/50 text-indigo-600 active:scale-95 transition-all shadow-sm group"
+            className="aspect-[2/3] border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-white/50 text-indigo-600 active:scale-95 transition-all shadow-sm"
           >
-            <Plus size={40} className="mb-2 group-hover:scale-110 transition-transform" />
+            <Plus size={40} className="mb-2" />
             <span className="text-xs font-bold font-serif">新しく紡ぐ</span>
           </div>
 
-          {/* 本のリスト */}
           {books.map(book => (
             <div 
               key={book.id} 
@@ -169,7 +171,9 @@ export default function App() {
     </div>
   );
 
-  // --- メインルーティング ---
+  // --- メインレンダリング ---
+  if (!appReady) return null;
+
   return (
     <div className="min-h-screen text-gray-900">
       {view === 'auth' && <AuthView />}
@@ -180,7 +184,7 @@ export default function App() {
           <AlertCircle size={48} className="text-indigo-600 mb-4" />
           <h2 className="text-xl font-bold mb-2">画面を準備中...</h2>
           <p className="text-gray-500 mb-6 text-sm">
-            次は「執筆・読書画面」のファイルを追加しましょう。
+            土台は成功しました！次はエディタ機能を追加します。
           </p>
           <button 
             onClick={() => setView('library')}
@@ -197,10 +201,7 @@ export default function App() {
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6"
           onClick={() => setShowSettings(false)}
         >
-          <div 
-            className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
               <Settings className="text-indigo-600" /> 設定
             </h3>
@@ -214,11 +215,11 @@ export default function App() {
                   <div className={`w-5 h-5 bg-white rounded-full absolute top-1 shadow-md transition-all duration-300 ${isDeleteMode ? 'left-8' : 'left-1'}`} />
                 </button>
               </div>
-              
               <button 
                 onClick={() => {
-                  if(confirm("APIキーを消去してログアウトしますか？")) {
+                  if(window.confirm("APIキーを消去してログアウトしますか？")) {
                     setApiKey("");
+                    localStorage.removeItem('gemini_api_key');
                     setView('auth');
                     setShowSettings(false);
                   }
