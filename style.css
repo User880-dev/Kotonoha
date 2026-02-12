@@ -1,19 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap');
 
-:root {
-    --app-bg: #f3f4f6;
-    --paper-bg: #fdfbf7;
-    --accent: #4f46e5;
-}
-
 body {
     margin: 0;
     padding: 0;
-    background-color: var(--app-bg);
+    background-color: #f3f4f6;
     font-family: 'Noto Sans JP', sans-serif;
     height: 100vh;
+    height: -webkit-fill-available;
     overflow: hidden;
-    /* iPhoneのタップ時のハイライトを消す */
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -21,17 +15,17 @@ body {
     font-family: 'Noto Serif JP', serif;
 }
 
-/* 縦書きの核となるスタイル */
+/* 縦書き設定 */
 .writing-vertical {
     writing-mode: vertical-rl;
     text-orientation: upright;
-    column-gap: 3rem;
+    column-gap: 2.5rem;
     height: 100%;
     min-width: 100vw;
-    padding: 4rem 3rem;
+    padding: 3rem 2rem;
 }
 
-/* スクロールバーを隠す */
+/* スクロールバー非表示 */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
@@ -40,40 +34,38 @@ body {
     scrollbar-width: none;
 }
 
-/* iPhoneの下部バー（セーフエリア）対応 */
+/* iPhoneセーフエリア */
 .safe-area-pb {
     padding-bottom: env(safe-area-inset-bottom);
 }
-
 .safe-area-pt {
     padding-top: env(safe-area-inset-top);
 }
 
-/* フェードインアニメーション */
-.animate-in {
-    animation: fadeIn 0.4s ease-out forwards;
-}
-
+/* アニメーション */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
-
-/* スタンプの演出 */
-.stamp-anim {
-    animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+.animate-in {
+    animation: fadeIn 0.4s ease-out forwards;
 }
 
+/* スタンプ演出 */
 @keyframes stampIn {
     from { opacity: 0; transform: scale(3) rotate(-30deg); }
     to { opacity: 0.8; transform: scale(1) rotate(-10deg); }
 }
+.stamp-anim {
+    animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
 
-/* テキストエリアの調整 */
+/* フォーム部品 */
 textarea {
     -webkit-appearance: none;
     border-radius: 0;
     resize: none;
     outline: none;
 }
+
 
