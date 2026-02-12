@@ -1148,7 +1148,6 @@ async function handleAIWrite(type) {
             document.getElementById('input-roadmap').value = roadmap;
             activeBook.worldSettings = roadmap;
 
-            // ★ここがポイント：あらすじと目次を要求するが、整形はしない
             userPrompt = `テーマ: ${promptInput}\n
 以下の構成で、物語の冒頭部分を執筆してください。
 
@@ -1180,7 +1179,6 @@ async function handleAIWrite(type) {
             }
             activeBook.content = text;
         } else {
-            // 続きを書く場合は改行して追加
             activeBook.content += "\n\n" + text;
         }
         
@@ -1603,7 +1601,7 @@ function showImagePreview(src) {
 // --- Event Listeners Setup ---
 
 function setupEventListeners() {
-    // Global
+    // グローバル背景生成
     document.getElementById('btn-global-bg').onclick = async () => {
         showLoading(true);
         try {
@@ -1618,10 +1616,11 @@ function setupEventListeners() {
         finally { showLoading(false); }
     };
 
+    // エラーとプレビューの閉じるボタン
     document.getElementById('btn-close-error').onclick = () => document.getElementById('error-toast').classList.add('hidden');
     document.getElementById('btn-close-preview').onclick = () => document.getElementById('image-preview-modal').classList.add('hidden');
 
-    // Library
+    // 書庫の操作
     document.getElementById('btn-new-book').onclick = () => createNewBook();
     document.getElementById('btn-three-words').onclick = () => {
         const shuffled = [...RANDOM_WORDS].sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -1630,7 +1629,7 @@ function setupEventListeners() {
         }
     };
     
-    // Settings Modal
+    // 設定モーダル
     document.getElementById('btn-settings').onclick = () => document.getElementById('settings-modal').classList.remove('hidden');
     document.getElementById('btn-close-settings').onclick = () => document.getElementById('settings-modal').classList.add('hidden');
     document.getElementById('input-api-key').onchange = (e) => {
@@ -1641,16 +1640,9 @@ function setupEventListeners() {
         if(confirm("全データを削除して初期化しますか？")) { localStorage.clear(); location.reload(); }
     };
 
-    // Writer: Header
-        // --- 省略 ---
-    document.getElementById('btn-close-settings').onclick = () => document.getElementById('settings-modal').classList.add('hidden');
-    // ...中略...
-
-    // ★ここからが貼り換えた部分
-    // Writer: Header
+    // 執筆画面：ヘッダー（戻る・完了）
     document.getElementById('btn-writer-back').onclick = () => {
         saveCurrentBook();
-        // 内容が空で、かつタイトルがデフォルトのままなら削除して戻る
         if (!activeBook.content.trim() && activeBook.title === "無題の物語") {
             books = books.filter(b => b.id !== activeBook.id);
             saveData();
@@ -1663,6 +1655,165 @@ function setupEventListeners() {
             }
         }
     };
+
+    document.getElementById('btn-writer-finish').onclick = () => { 
+        saveCurrentBook(); 
+        if (!activeBook.content.trim() && activeBook.title === "無題の物語") {
+            books = books.filter(b => b.id !== activeBook.id);
+        }
+        saveData();
+        switchView('library'); 
+        renderLibrary(); 
+    };
+
+    // 目次ボタン
+    document.getElementById('btn-open-toc').onclick = () => {
+        const modal = document.getElementById('toc-modal');
+        const list = document.getElementById('toc-list');
+        const synopsisInput = document.getElementById('input-synopsis');
+        synopsisInput.value = activeBook.synopsis || "";
+        list.innerHTML = "";
+        const content = activeBook.content || "";
+        const lines = content.split('\n');
+        let foundChapter = false;
+
+        lines.forEach((line, index) => {
+            const isHeader = line.length < 50 && (
+                line.match(/^第[0-9０-９]+[話章]/) || 
+                line.match(/^[Cc]hapter/) || 
+                line.match(/^タイトル[:：]/) ||
+                line.match(/^[0-9]+[話章.]/)
+            );
+            if (isHeader) {
+                foundChapter = true;
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 rounded-lg hover:bg-indigo-50 text-sm border-b border-gray-100 flex items-center gap-2 group transition-all";
+                btn.innerHTML = `<span class="text-indigo-400">●</span><span class="font-medium">${line}</span>`;
+                btn.onclick = () => {
+                    modal.classList.add('hidden');
+                    switchWriterTab('write');
+                    const textarea = document.getElementById('textarea-content');
+                    const position = lines.slice(0, index).join('\n').length;
+                    textarea.focus();
+                    textarea.setSelectionRange(position, position + line.length);
+                    textarea.scrollTop = position / content.length * textarea.scrollHeight; 
+                };
+                list.appendChild(btn);
+            }
+        });
+        if (!foundChapter) {
+            list.innerHTML = `<div class="text-center text-gray-400 text-xs py-4">見出しが見つかりません。</div>`;
+        }
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+    };
+
+    document.getElementById('btn-close-toc').onclick = () => {
+        if (activeBook) {
+            activeBook.synopsis = document.getElementById('input-synopsis').value;
+            saveData();
+        }
+        document.getElementById('toc-modal').classList.add('hidden');
+    };
+
+    // タブの切り替え
+    document.getElementById('tab-btn-write').onclick = () => switchWriterTab('write');
+    document.getElementById('tab-btn-preview').onclick = () => switchWriterTab('preview');
+    document.getElementById('tab-btn-tools').onclick = () => switchWriterTab('tools');
+
+    // ツール内のサブタブ切り替え
+    document.getElementById('tool-subtab-ai').onclick = () => {
+        document.getElementById('tool-panel-ai').classList.remove('hidden');
+        document.getElementById('tool-panel-settings').classList.add('hidden');
+        document.getElementById('tool-subtab-ai').classList.add('bg-white','shadow');
+        document.getElementById('tool-subtab-settings').classList.remove('bg-white','shadow');
+    };
+    document.getElementById('tool-subtab-settings').onclick = () => {
+        document.getElementById('tool-panel-ai').classList.add('hidden');
+        document.getElementById('tool-panel-settings').classList.remove('hidden');
+        document.getElementById('tool-subtab-ai').classList.remove('bg-white','shadow');
+        document.getElementById('tool-subtab-settings').classList.add('bg-white','shadow');
+    };
+
+    // AI執筆アクション
+    document.getElementById('select-genre-main').onchange = (e) => updateSubGenre(e.target.value);
+    document.getElementById('btn-ai-write-new').onclick = () => handleAIWrite('new');
+    document.getElementById('btn-ai-write-continue').onclick = () => handleAIWrite('continue');
+    
+    // 画像・装丁
+    document.getElementById('btn-show-illus-input').onclick = () => document.getElementById('illus-input-container').classList.remove('hidden');
+    document.getElementById('btn-close-illus').onclick = () => document.getElementById('illus-input-container').classList.add('hidden');
+    document.getElementById('btn-gen-illus').onclick = handleGenerateIllustration;
+    document.getElementById('btn-gen-cover').onclick = handleGenerateCover;
+    document.getElementById('file-upload-cover').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                activeBook.cover = await compressImage(reader.result, 400, 0.7);
+                saveData();
+                renderVisualGallery();
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // 設定・出力
+    document.getElementById('btn-add-character').onclick = () => {
+        activeBook.characters.push({ name: "", desc: "" });
+        saveData();
+        renderCharactersList();
+    };
+    document.getElementById('btn-export-txt').onclick = () => {
+        const blob = new Blob([activeBook.content], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${activeBook.title}.txt`;
+        a.click();
+    };
+    document.getElementById('btn-delete-book').onclick = () => {
+        if (confirm("本当にこの物語を削除しますか？")) {
+            books = books.filter(b => b.id !== activeBook.id);
+            saveData();
+            switchView('library');
+            renderLibrary();
+        }
+    };
+    document.getElementById('btn-refine-text').onclick = async () => {
+        const textarea = document.getElementById('textarea-content');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selected = textarea.value.substring(start, end);
+        if(!selected) return alert("言葉を選択してください");
+        showLoading(true);
+        try {
+            const res = await generateText(`言葉「${selected}」の情緒的な言い換えを提案してください。`);
+            alert(res);
+        } catch(e) { showError(e.message); }
+        finally { showLoading(false); }
+    };
+
+    // 読書画面アクション
+    document.getElementById('btn-reader-library').onclick = () => {
+        audioPlayer.pause();
+        switchView('library');
+        renderLibrary();
+    };
+    document.getElementById('btn-reader-tts').onclick = handleTTS;
+    document.getElementById('btn-reader-quote').onclick = async () => {
+        const sel = window.getSelection().toString();
+        if(!sel) return alert("文字を選択してください");
+        showLoading(true);
+        try {
+            const url = await createQuoteCard(sel, activeBook.title, "私", activeBook.cover);
+            const a = document.createElement('a'); a.href = url; a.download = 'quote.png'; a.click();
+        } catch(e) { showError(e.message); }
+        finally { showLoading(false); }
+    };
+    document.getElementById('btn-reader-chat').onclick = () => document.getElementById('reader-chat-overlay').classList.remove('hidden');
+    document.getElementById('btn-close-chat').onclick = () => document.getElementById('reader-chat-overlay').classList.add('hidden');
+    document.getElementById('btn-send-chat').onclick = handleChatSend;
+}
 
     document.getElementById('btn-writer-finish').onclick = () => { 
         saveCurrentBook(); 
