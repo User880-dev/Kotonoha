@@ -6,8 +6,10 @@ body {
     background-color: #f3f4f6;
     font-family: 'Noto Sans JP', sans-serif;
     height: 100vh;
+    /* モバイルブラウザでのアドレスバー対策 */
     height: -webkit-fill-available;
     overflow: hidden;
+    /* タップ時のハイライトを無効化 */
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -15,17 +17,20 @@ body {
     font-family: 'Noto Serif JP', serif;
 }
 
-/* 縦書き設定 */
+/* 縦書きのスタイル定義 */
 .writing-vertical {
     writing-mode: vertical-rl;
     text-orientation: upright;
     column-gap: 2.5rem;
     height: 100%;
     min-width: 100vw;
-    padding: 3rem 2rem;
+    padding: 4rem 2rem;
+    /* 横スクロールを滑らかに */
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
-/* スクロールバー非表示 */
+/* スクロールバーを隠す（見た目をスッキリさせるため） */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
@@ -34,7 +39,7 @@ body {
     scrollbar-width: none;
 }
 
-/* iPhoneセーフエリア */
+/* iPhoneのセーフエリア（ノッチやホームバー）対応 */
 .safe-area-pb {
     padding-bottom: env(safe-area-inset-bottom);
 }
@@ -42,30 +47,30 @@ body {
     padding-top: env(safe-area-inset-top);
 }
 
-/* アニメーション */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+/* フェードインアニメーション */
 .animate-in {
     animation: fadeIn 0.4s ease-out forwards;
 }
 
-/* スタンプ演出 */
-@keyframes stampIn {
-    from { opacity: 0; transform: scale(3) rotate(-30deg); }
-    to { opacity: 0.8; transform: scale(1) rotate(-10deg); }
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
+
+/* スタンプが押される時のアニメーション */
 .stamp-anim {
     animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-/* フォーム部品 */
+@keyframes stampIn {
+    from { opacity: 0; transform: scale(3) rotate(-30deg); }
+    to { opacity: 0.8; transform: scale(1) rotate(-10deg); }
+}
+
+/* テキストエリアのデフォルトスタイルをリセット */
 textarea {
     -webkit-appearance: none;
     border-radius: 0;
     resize: none;
     outline: none;
 }
-
-
