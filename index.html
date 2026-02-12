@@ -212,452 +212,371 @@ body {
     margin-left: 1em;
     line-height: 1.8;
 }
+/* --- 小説レイアウトの最終定義 --- */
+.novel-paragraph {
+    text-indent: 1em;    /* 文頭の一文字下げ */
+    line-height: 2.2;    /* ゆったりした行間 */
+    margin-bottom: 0;    /* 段落間を詰め、縦書きの美しさを優先 */
+    text-align: justify;
+}
+
+.toc-link {
+    color: #4f46e5;
+    text-decoration: none;
+    border-bottom: 1px dashed #a5b4fc;
+    cursor: pointer;
+}
+
+.chapter-title {
+    font-weight: bold;
+    font-size: 1.25em;
+    margin: 3em 0 2em 0; /* 章の前後を空ける */
+}
+
+.synopsis-text {
+    font-size: 0.95em;
+    color: #4b5563;
+    line-height: 1.8;
+}
 
 </style>
-        
     </style>
+    
     <script>
-/**
- * ==============================================================================
- * PART 3: CONSTANTS, HELPERS & API LOGIC
- * ==============================================================================
- */
-
-// APIキー設定
-let apiKey = localStorage.getItem('kotonoha_api_key') || "";
-
-// モデル定義
-const GEMINI_MODEL = "gemini-2.5-flash"; 
-const IMAGEN_MODEL = "imagen-3-pro"; 
-const TTS_MODEL    = "gemini-2.5-flash-preview-tts";
-
-// 45種類のモデルレジストリ
-const MODEL_REGISTRY = {
-    stable: [
-        "gemini-3.0-flash", "gemini-3.0-pro", "gemini-2.5-flash", "gemini-2.5-pro",
-        "gemini-2.0-flash-001", "gemini-2.0-flash-lite-001", "gemini-2.5-flash-lite",
-        "gemini-1.5-pro", "gemini-1.5-flash", "gemini-flash-latest", "gemini-pro-latest", "gemini-ultra-latest"
-    ],
-    specialized: [
-        "imagen-3-pro", "imagen-3-fast", "gemini-2.5-flash-image", "gemini-2.5-pro-image",
-        "gemini-2.0-flash-exp-image-generation", "gemini-2.5-flash-preview-tts",
-        "gemini-2.5-pro-preview-tts", "veo-1.0-video-generation", "gemini-3-pro-vision", "nano-banana-pro-preview"
-    ],
-    preview: [
-        "gemini-3-flash-preview", "gemini-3-pro-preview", "gemini-3-ultra-preview",
-        "gemini-2.5-flash-preview-09-2025", "gemini-2.5-flash-lite-preview-09-2025",
-        "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-exp-1206",
-        "gemini-2.5-computer-use-preview-10-2025", "deep-research-pro-preview-12-2025",
-        "gemini-robotics-er-1.5-preview", "gemini-3-med-pro", "gemini-3-code-pro",
-        "gemini-3-law-pro", "gemini-3-finance-pro"
-    ],
-    gemma: [
-        "gemma-3-1b-it", "gemma-3-4b-it", "gemma-3-12b-it", "gemma-3-27b-it",
-        "gemma-3n-e4b-it", "gemma-3n-e2b-it", "gemma-2-27b", "gemma-2-9b"
-    ]
-};
-
-const GENRE_DEFINITIONS = {
-    "ファンタジー": ["王道・ハイファンタジー", "異世界転生・転移", "ダークファンタジー", "魔法少女・魔女", "ダンジョン・冒険", "和風ファンタジー"],
-    "SF": ["スペースオペラ", "サイバーパンク", "タイムリープ", "近未来・ディストピア", "AI・ロボット"],
-    "ミステリー": ["本格推理", "サスペンス", "ハードボイルド", "日常の謎", "警察・刑事"],
-    "恋愛": ["学園ラブコメ", "大人の恋愛", "悲恋・ドラマ", "幼馴染", "オフィスラブ"],
-    "ホラー": ["心霊・オカルト", "サイコホラー", "都市伝説", "怪談", "クトゥルフ神話"],
-    "純文学": ["私小説", "青春・群像劇", "家族・人間ドラマ", "歴史・時代小説", "詩的・幻想"],
-    "歴史・時代": ["戦国・幕末", "平安・鎌倉", "三国志", "西洋史・騎士"],
-    "児童文学": ["童話・おとぎ話", "冒険・友情", "動物もの", "教訓・寓話"],
-    "詩歌・エッセイ": ["現代詩", "短歌・俳句", "散文詩", "日記・随筆"],
-    "ビジネス・教養": ["経済小説", "お仕事・業界もの", "自己啓発ストーリー"]
-};
-
-const RANDOM_WORDS = ["雨宿り", "懐中時計", "秘密", "猫", "手紙", "魔法", "嘘", "約束", "桜", "夜行列車"];
-
-const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-const compressImage = (base64Str, maxWidth = 300, quality = 0.7) => {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.src = base64Str;
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const scaleSize = maxWidth / img.width;
-            canvas.width = maxWidth;
-            canvas.height = img.height * scaleSize;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-        };
-        img.onerror = () => resolve(base64Str);
-    });
-};
-
-const pcmToWav = (base64PCM) => {
-    const binaryString = window.atob(base64PCM);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-    const wavHeader = new ArrayBuffer(44);
-    const view = new DataView(wavHeader);
-    const writeString = (view, offset, string) => {
-        for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
-    };
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + len, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, 1, true);
-    view.setUint32(24, 24000, true);
-    view.setUint32(28, 24000 * 2, true);
-    view.setUint16(32, 2, true);
-    view.setUint16(34, 16, true);
-    writeString(view, 36, 'data');
-    view.setUint32(40, len, true);
-    const blob = new Blob([view, bytes], { type: 'audio/wav' });
-    return URL.createObjectURL(blob);
-};
-
-const createQuoteCard = (text, title, author, backgroundSrc) => {
-    return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1080; canvas.height = 1080;
-        const ctx = canvas.getContext('2d');
-        const bg = new Image();
-        bg.crossOrigin = "Anonymous";
-        bg.src = backgroundSrc || ""; 
-        const drawContent = () => {
-            if (!backgroundSrc) {
-                ctx.fillStyle = "#fdfbf7"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            } else {
-                const scale = Math.max(canvas.width / bg.width, canvas.height / bg.height);
-                const x = (canvas.width / 2) - (bg.width / 2) * scale;
-                const y = (canvas.height / 2) - (bg.height / 2) * scale;
-                ctx.drawImage(bg, x, y, bg.width * scale, bg.height * scale);
-                ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        serif: ['"Shippori Mincho"', 'serif'],
+                    },
+                    colors: {
+                        paper: '#fdfbf7',
+                    }
+                }
             }
-            ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 4; ctx.strokeRect(40, 40, 1000, 1000);
-            ctx.fillStyle = "#ffffff"; ctx.textBaseline = "top"; ctx.font = `bold 50px serif`;
-            let cursorX = 900; let cursorY = 150;
-            for (let i = 0; i < text.length; i++) {
-                ctx.fillText(text[i], cursorX, cursorY);
-                cursorY += 60;
-                if (cursorY > 850) { cursorY = 150; cursorX -= 80; }
-            }
-            ctx.font = `30px serif`;
-            ctx.fillText(title, 100, 950);
-            resolve(canvas.toDataURL('image/png'));
-        };
-        if (backgroundSrc) { bg.onload = drawContent; bg.onerror = drawContent; } else { drawContent(); }
-    });
-};
-
-const apiCall = async (url, payload) => {
-    if (!apiKey) throw new Error("APIキーが未設定です。");
-    const response = await fetch(`${url}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error?.message || "通信エラー");
-    }
-    return response.json();
-};
-
-const generateText = async (prompt, systemPrompt = "") => {
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] }
-    };
-    const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, payload);
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-};
-
-const generateImage = async (prompt) => {
-    const payload = {
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ["IMAGE"], candidateCount: 1 }
-    };
-    try {
-        const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateContent`, payload);
-        const imagePart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        if (imagePart) return `data:image/png;base64,${imagePart.inlineData.data}`;
-        
-        const fallbackModel = "gemini-2.0-flash-exp-image-generation";
-        const fbData = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent`, payload);
-        const fbPart = fbData.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-        if (fbPart) return `data:image/png;base64,${fbPart.inlineData.data}`;
-        throw new Error("画像データが取得できませんでした。");
-    } catch (e) {
-        console.error(e);
-        throw new Error("画像生成エラー: APIキーの権限を確認してください。");
-    }
-};
-
-const generateSpeech = async (text) => {
-    const payload = {
-        contents: [{ parts: [{ text: "朗読してください:\n" + text }] }],
-        generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } }
-    };
-    const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, payload);
-    const audioPart = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-    if (audioPart) return audioPart.inlineData.data;
-    throw new Error("音声生成失敗");
-};
-
-/**
- * PART 4: UI LOGIC & STATE MANAGEMENT
- */
-let books = [];
-let activeBookId = null;
-let activeBook = null;
-let currentView = 'library';
-let backgroundImage = localStorage.getItem('kotonoha_bg') || null;
-let audioPlayer = document.getElementById('audio-player');
-let isPlayingTTS = false;
-
-const views = {
-    library: document.getElementById('view-library'),
-    writing: document.getElementById('view-writing'),
-    reader: document.getElementById('view-reader')
-};
-
-function init() {
-    loadData();
-    applyBackground();
-    renderLibrary();
-    setupEventListeners();
-    lucide.createIcons();
-    document.getElementById('input-api-key').value = apiKey;
-}
-
-function loadData() {
-    const saved = localStorage.getItem('kotonoha_books');
-    if (saved) {
-        try {
-            books = JSON.parse(saved);
-        } catch (e) { books = []; }
-    }
-}
-
-function saveData() {
-    localStorage.setItem('kotonoha_books', JSON.stringify(books));
-}
-
-function applyBackground() {
-    const bg = document.getElementById('bg-layer');
-    if (backgroundImage) {
-        bg.style.backgroundImage = `url(${backgroundImage})`;
-        bg.style.opacity = '1';
-    } else {
-        bg.style.backgroundImage = 'none';
-    }
-}
-
-function switchView(name) {
-    Object.values(views).forEach(el => { el.classList.add('hidden'); el.classList.remove('flex'); });
-    views[name].classList.remove('hidden');
-    if (name !== 'library') views[name].classList.add('flex');
-    currentView = name;
-    window.scrollTo(0, 0);
-}
-
-function renderLibrary() {
-    const grid = document.getElementById('book-grid');
-    const newBtn = document.getElementById('btn-new-book');
-    grid.innerHTML = '';
-    grid.appendChild(newBtn);
-    books.forEach(book => {
-        const div = document.createElement('div');
-        div.className = "relative animate-fade-in";
-        div.onclick = () => openReader(book.id);
-        const cover = book.cover ? `<img src="${book.cover}" class="w-full h-full object-cover">` : `<div class="w-full h-full bg-indigo-50 flex items-center justify-center p-4 text-center font-serif text-gray-600 writing-vertical-rl">${book.title}</div>`;
-        div.innerHTML = `
-            <div class="aspect-[2/3] bg-white rounded shadow-md overflow-hidden border-l-4 border-gray-800 active:scale-95 transition-transform">
-                ${cover}
-                <div class="absolute bottom-0 left-0 right-0 bg-black/60 p-2 text-white text-[10px] truncate">${book.title}</div>
-            </div>`;
-        grid.appendChild(div);
-    });
-    lucide.createIcons();
-}
-
-function createNewBook(title = "無題の物語", content = "", genre = "ファンタジー") {
-    const book = { id: generateId(), title, content, genre, cover: null, illustrations: [], synopsis: "", updatedAt: Date.now() };
-    books.unshift(book);
-    saveData();
-    openWriter(book.id);
-}
-
-function openWriter(id) {
-    activeBookId = id;
-    activeBook = books.find(b => b.id === id);
-    if (!activeBook) return;
-    document.getElementById('input-book-title').value = activeBook.title;
-    document.getElementById('textarea-content').value = activeBook.content;
-    const gSelect = document.getElementById('select-genre-main');
-    gSelect.innerHTML = Object.keys(GENRE_DEFINITIONS).map(k => `<option value="${k}">${k}</option>`).join('');
-    gSelect.value = activeBook.genre;
-    updateSubGenre(activeBook.genre);
-    switchWriterTab('write');
-    switchView('writing');
-}
-
-function saveCurrentBook() {
-    if (!activeBook) return;
-    activeBook.title = document.getElementById('input-book-title').value;
-    activeBook.content = document.getElementById('textarea-content').value;
-    activeBook.updatedAt = Date.now();
-    saveData();
-}
-
-function switchWriterTab(tab) {
-    ['write', 'preview', 'tools'].forEach(t => {
-        document.getElementById(`tab-content-${t}`).classList.add('hidden');
-        document.getElementById(`tab-btn-${t}`).classList.replace('text-indigo-600', 'text-gray-400');
-    });
-    document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
-    document.getElementById(`tab-btn-${tab}`).classList.replace('text-gray-400', 'text-indigo-600');
-    if (tab === 'preview') {
-        saveCurrentBook();
-        renderVerticalText(document.getElementById('preview-vertical-text'), activeBook.content, activeBook.illustrations);
-    }
-}
-
-function updateSubGenre(main) {
-    const sSelect = document.getElementById('select-genre-sub');
-    const subs = GENRE_DEFINITIONS[main] || [];
-    sSelect.innerHTML = subs.map(s => `<option value="${s}">${s}</option>`).join('');
-}
-
-async function handleAIWrite(type) {
-    saveCurrentBook();
-    const prompt = document.getElementById('input-ai-prompt').value.trim();
-    const target = parseInt(document.getElementById('select-pages').value);
-    const roadmap = document.getElementById('input-roadmap').value;
-    showLoading(true);
-    try {
-        let system = `あなたはプロの作家です。小説の本文のみ出力してください。`;
-        let user = "";
-        if (type === 'new') {
-            user = `テーマ: ${prompt}\n以下の構成で物語の冒頭を書いてください。\n1.【タイトル】\n2.【あらすじ】\n3.【目次】（第1〜5話）\n4.【第1話 本文】\n約${target}文字。`;
-        } else {
-            user = `前回の続きから書いてください。全${activeBook.totalChapters}話中の第${activeBook.currentChapter + 1}話。本文のみ出力。`;
         }
-        const text = await generateText(user, system);
-        if (type === 'new') {
-            const m = text.match(/【タイトル】[:：]?\s*(.+)/);
-            if (m) activeBook.title = m[1].trim();
-            activeBook.content = text;
-        } else {
-            activeBook.content += "\n\n" + text;
-        }
-        document.getElementById('textarea-content').value = activeBook.content;
-        saveData();
-        switchWriterTab('write');
-    } catch (e) { showError(e.message); }
-    finally { showLoading(false); }
-}
+    </script>
+</head>
+<body class="bg-[#f3f4f6] text-gray-900 min-h-screen overflow-hidden relative">
 
-function updateContinueButton() {
-    // 継続ボタンのラベル更新ロジックがあればここに記述
-}
+    <div id="bg-layer" class="absolute inset-0 z-0 bg-cover bg-center transition-opacity duration-500 opacity-100" style="background-image: none;"></div>
+    
+    <div id="app-container" class="relative z-10 w-full h-full min-h-screen flex flex-col">
 
-function openReader(id) {
-    activeBookId = id;
-    activeBook = books.find(b => b.id === id);
-    renderVerticalText(document.getElementById('reader-content-area'), activeBook.content, activeBook.illustrations);
-    switchView('reader');
-}
+        <div id="view-library" class="view-section w-full h-full flex flex-col p-4 md:p-6 max-w-6xl mx-auto overflow-y-auto safe-area-pb">
+            
+            <header class="flex justify-between items-center mb-8 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-sm sticky top-0 z-30">
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2 select-none">
+                    <i data-lucide="library" class="w-8 h-8"></i>
+                    言の葉書庫
+                </h1>
+                <div class="flex gap-2 relative z-40">
+                    <button id="btn-three-words" class="p-2 hover:bg-indigo-50 text-indigo-600 rounded-full transition-colors cursor-pointer" title="三題噺（お題ガチャ）">
+                        <i data-lucide="dice-5" class="w-5 h-5"></i>
+                    </button>
+                    <button id="btn-search-aozora" class="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" title="名作を探す">
+                        <i data-lucide="search" class="w-5 h-5"></i>
+                    </button>
+                    <button id="btn-global-bg" class="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" title="背景生成">
+                        <i data-lucide="image" class="w-5 h-5"></i>
+                    </button>
+                    <button id="btn-settings" class="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer" title="設定">
+                         <i data-lucide="settings" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </header>
 
-function renderVerticalText(container, content, illustrations) {
-    if (!content) { container.innerHTML = '<p class="p-4 text-gray-400">白紙です</p>'; return; }
-    container.innerHTML = '';
-    const lines = content.split('\n');
-    let html = '';
-    let inToc = false;
-    let inSyn = false;
-    lines.forEach(line => {
-        const text = line.trim();
-        if (!text) { html += '<div style="height:100%; width:1.5em;"></div>'; return; }
-        if (text.includes('【あらすじ】')) { inSyn = true; inToc = false; html += `<h3 class="font-bold text-lg mb-4 mt-8">【あらすじ】</h3>`; return; }
-        if (text.includes('【目次】')) { inToc = true; inSyn = false; html += `<h3 class="font-bold text-lg mb-4 mt-8">【目次】</h3>`; return; }
-        const isHeader = text.length < 40 && (text.match(/^第[0-9]+話/) || text.match(/^タイトル/));
-        if (isHeader) { inToc = inSyn = false; const lid = "ch-" + text.replace(/\s+/g, '-'); html += `<p id="${lid}" class="chapter-title">${text}</p>`; return; }
-        if (inToc) { const lid = "ch-" + text.replace(/\s+/g, '-'); html += `<p class="mb-2"><a onclick="document.getElementById('${lid}')?.scrollIntoView({behavior:'smooth'})" class="toc-link">${text}</a></p>`; }
-        else if (inSyn) { html += `<p class="synopsis-text">${text}</p>`; }
-        else { const style = text.match(/^[「『（]/) ? 'style="text-indent:0"' : ''; html += `<p class="novel-paragraph" ${style}>${text}</p>`; }
-    });
-    container.innerHTML = html;
-}
+            <div id="fan-letter-notification" class="hidden mb-6 bg-white border border-blue-100 p-4 rounded-lg shadow-sm flex items-center gap-4 cursor-pointer hover:bg-blue-50 transition-colors">
+                <div class="bg-blue-100 p-2 rounded-full text-blue-600">
+                    <i data-lucide="mail" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <div class="font-bold text-gray-800">新しい手紙が届いています</div>
+                    <div id="fan-letter-source" class="text-sm text-gray-500">『タイトル』の読者より</div>
+                </div>
+            </div>
 
-async function handleTTS() {
-    if (isPlayingTTS) { audioPlayer.pause(); isPlayingTTS = false; return; }
-    showLoading(true);
-    try {
-        const url = pcmToWav(await generateSpeech(activeBook.content.slice(0, 2000)));
-        audioPlayer.src = url; audioPlayer.play(); isPlayingTTS = true;
-    } catch (e) { showError(e.message); }
-    finally { showLoading(false); }
-}
+            <div id="book-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 pb-20">
+                <button id="btn-new-book" class="aspect-[2/3] bg-white/60 backdrop-blur-sm border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:bg-white/80 transition-all active:scale-95 cursor-pointer">
+                    <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4 text-indigo-600">
+                        <i data-lucide="pen-tool" class="w-8 h-8"></i>
+                    </div>
+                    <span class="text-gray-600 font-medium">新しい物語を紡ぐ</span>
+                </button>
+                
+                </div>
+        </div>
 
-async function handleChatSend() {
-    const input = document.getElementById('input-chat-message');
-    const text = input.value; if (!text) return;
-    appendChatMessage('user', text); input.value = '';
-    const res = await generateText(text, `あなたは作品「${activeBook.title}」の作者です。`);
-    appendChatMessage('model', res);
-}
+                <div id="view-writing" class="view-section hidden fixed inset-0 z-50 bg-white flex flex-col h-full">
+            
+                        <div class="flex items-center justify-between p-2 border-b bg-white z-50 shadow-sm relative h-14 shrink-0">
+                <div class="flex items-center">
+                    <button id="btn-writer-back" class="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-100 rounded-full cursor-pointer">
+                        <i data-lucide="chevron-left" class="w-6 h-6"></i>
+                    </button>
+                    <button id="btn-open-toc" class="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-100 rounded-full cursor-pointer ml-1" title="目次とあらすじ">
+                        <i data-lucide="list" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 mx-2 min-w-0">
+                    <input id="input-book-title" type="text" class="w-full text-center font-bold bg-transparent border-none outline-none truncate text-lg p-1" placeholder="タイトル">
+                </div>
+                
+                <button id="btn-writer-finish" class="flex items-center justify-center w-10 h-10 text-indigo-600 font-bold hover:bg-indigo-50 rounded-full cursor-pointer">
+                    <i data-lucide="check" class="w-6 h-6"></i>
+                </button>
+            </div>
 
-function appendChatMessage(role, text) {
-    const container = document.getElementById('chat-messages');
-    const div = document.createElement('div');
-    div.className = `p-2 rounded mb-2 ${role === 'user' ? 'bg-indigo-100 ml-auto' : 'bg-gray-100'}`;
-    div.textContent = text;
-    container.appendChild(div);
-}
+            <div class="flex-1 overflow-hidden relative w-full">
+                
+                <div id="tab-content-write" class="h-full w-full flex flex-col">
+                    <textarea id="textarea-content" class="flex-1 w-full p-4 text-lg leading-loose resize-none focus:outline-none pb-24" placeholder="ここに物語を..."></textarea>
+                    
+                    <div class="absolute bottom-6 right-4 flex flex-col gap-2 z-40">
+                        <button id="btn-refine-text" class="p-3 bg-white text-indigo-600 rounded-full shadow-lg border border-indigo-100 flex items-center justify-center" title="言葉を磨く">
+                            <i data-lucide="sparkles" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
 
-function showLoading(s) { document.getElementById('loading-overlay').classList.toggle('hidden', !s); }
-function showError(m) { alert(m); }
-function showImagePreview(s) { document.getElementById('preview-modal-img').src = s; document.getElementById('image-preview-modal').classList.remove('hidden'); }
+                <div id="tab-content-preview" class="hidden h-full w-full overflow-x-auto overflow-y-hidden bg-paper">
+                    <div id="preview-vertical-text" class="h-full font-serif text-lg leading-loose text-gray-800 py-10 px-8 writing-vertical-rl min-w-[100vw]">
+                    </div>
+                </div>
 
-function setupEventListeners() {
-    document.getElementById('btn-global-bg').onclick = async () => {
-        showLoading(true);
-        try {
-            const b64 = await generateImage("Magical library, fantasy art style, high quality");
-            if (b64) { backgroundImage = await compressImage(b64, 800, 0.6); localStorage.setItem('kotonoha_bg', backgroundImage); applyBackground(); }
-        } catch(e) { showError(e.message); } finally { showLoading(false); }
-    };
-    document.getElementById('btn-close-preview').onclick = () => document.getElementById('image-preview-modal').classList.add('hidden');
-    document.getElementById('btn-new-book').onclick = () => createNewBook();
-    document.getElementById('btn-settings').onclick = () => document.getElementById('settings-modal').classList.remove('hidden');
-    document.getElementById('btn-close-settings').onclick = () => document.getElementById('settings-modal').classList.add('hidden');
-    document.getElementById('input-api-key').onchange = (e) => { apiKey = e.target.value; localStorage.setItem('kotonoha_api_key', apiKey); };
-    document.getElementById('btn-reset-app').onclick = () => { if(confirm("初期化しますか？")) { localStorage.clear(); location.reload(); } };
-    document.getElementById('btn-writer-back').onclick = () => { saveCurrentBook(); switchView('library'); renderLibrary(); };
-    document.getElementById('btn-writer-finish').onclick = () => { saveCurrentBook(); switchView('library'); renderLibrary(); };
-    document.getElementById('tab-btn-write').onclick = () => switchWriterTab('write');
-    document.getElementById('tab-btn-preview').onclick = () => switchWriterTab('preview');
-    document.getElementById('tab-btn-tools').onclick = () => switchWriterTab('tools');
-    document.getElementById('btn-ai-write-new').onclick = () => handleAIWrite('new');
-    document.getElementById('btn-ai-write-continue').onclick = () => handleAIWrite('continue');
-    document.getElementById('btn-gen-cover').onclick = async () => {
-        showLoading(true);
-        try {
-            const b64 = await generateImage(`Book cover art for ${activeBook.title}, no text, elegant`);
-            activeBook.cover = await compressImage(b64, 400, 0.7); saveData(); renderLibrary();
-        } catch(e) { showError(e.message); } finally { showLoading(false); }
-    };
-    document.getElementById('btn-reader-library').onclick = () => { audioPlayer.pause(); switchView('library'); renderLibrary(); };
-    document.getElementById('btn-reader-tts').onclick = handleTTS;
-    document.getElementById('btn-reader-chat').onclick = () => document.getElementById('reader-chat-overlay').classList.toggle('hidden');
-    document.getElementById('btn-send-chat').onclick = handleChatSend;
-}
+                <div id="tab-content-tools" class="hidden h-full w-full overflow-y-auto bg-gray-50 p-4 pb-20">
+                    
+                    <div class="flex bg-gray-200 rounded-lg p-1 mb-4">
+                        <button id="tool-subtab-ai" class="flex-1 py-1 text-xs rounded-md bg-white shadow font-medium transition-all">AI執筆・装丁</button>
+                        <button id="tool-subtab-settings" class="flex-1 py-1 text-xs rounded-md transition-all">設定・出力</button>
+                    </div>
 
-window.addEventListener('DOMContentLoaded', init);
+                    <div id="tool-panel-ai" class="space-y-6">
+                        <section class="bg-white p-4 rounded-xl shadow-sm">
+                            <h3 class="text-sm font-bold mb-2 flex items-center gap-2"><i data-lucide="feather" class="w-4 h-4"></i> AIと一緒に書く</h3>
+                            
+                            <div class="flex gap-2 mb-2">
+                                <select id="select-genre-main" class="flex-1 p-2 border rounded text-xs bg-white"></select>
+                                <select id="select-genre-sub" class="flex-1 p-2 border rounded text-xs bg-white">
+                                    <option value="">（詳細なし）</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="text-[10px] text-gray-500 mb-1 block">物語の規模（スケール）</label>
+                                <select id="select-scale" class="w-full p-2 border rounded text-xs bg-white">
+                                    <option value="short">中編小説（15〜25話程度）</option>
+                                    <option value="standard" selected>長編小説（30〜60話程度）</option>
+                                    <option value="epic">超大作シリーズ（80〜120話程度）</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="text-[10px] text-gray-500 mb-1 block">1回あたりの執筆量</label>
+                                <select id="select-pages" class="w-full p-2 border rounded text-xs bg-white">
+                                    <option value="400">サクサク（約400文字）</option>
+                                    <option value="800" selected>標準（約800文字）</option>
+                                    <option value="1600">じっくり（約1600文字）</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4 bg-gray-100 p-3 rounded-lg border border-gray-200">
+                                <label class="text-[10px] font-bold text-gray-600 mb-2 block flex items-center gap-1">
+                                    <i data-lucide="map" class="w-3 h-3"></i> 運命の設計図（構成案）
+                                </label>
+                                <textarea id="input-roadmap" class="w-full p-2 border rounded text-[10px] h-32 font-mono leading-relaxed bg-white" 
+                                    placeholder="物語を開始すると、ここに全話の構成が自動生成されます。"></textarea>
+                            </div>
+
+                            <textarea id="input-ai-prompt" class="w-full p-2 border rounded text-sm h-20 mb-2" placeholder="次の展開やアイデア..."></textarea>
+                            
+                            <div class="flex gap-2 mb-2">
+                                <button id="btn-ai-write-new" class="flex-1 bg-green-600 text-white py-2 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-green-700">
+                                    <i data-lucide="pen-tool" class="w-3 h-3"></i> 物語を開始する
+                                </button>
+                                <button id="btn-ai-write-continue" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-indigo-700 disabled:bg-gray-300">
+                                    <i data-lucide="more-horizontal" class="w-3 h-3"></i> 続きを書く
+                                </button>
+                            </div>
+                            
+                            <button id="btn-ai-review" class="w-full bg-orange-100 text-orange-800 py-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                                <i data-lucide="user" class="w-3 h-3"></i> AI編集者のレビュー
+                            </button>
+                        </section>
+
+                        <section class="bg-white p-4 rounded-xl shadow-sm">
+                            <h3 class="text-sm font-bold mb-2 flex items-center gap-2"><i data-lucide="image" class="w-4 h-4"></i> ビジュアル</h3>
+                            <div class="flex gap-2 mb-2">
+                                <button id="btn-gen-cover" class="flex-1 border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50">表紙を生成</button>
+                                <label class="flex-1 border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50 flex justify-center items-center cursor-pointer">
+                                    UP
+                                    <input type="file" id="file-upload-cover" class="hidden" accept="image/*">
+                                </label>
+                            </div>
+
+                            <div id="illustration-control-area" class="mb-4">
+                                <button id="btn-show-illus-input" class="w-full border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50">挿絵を追加</button>
+                                <div id="illus-input-container" class="hidden flex flex-col gap-2 mt-2">
+                                    <textarea id="input-illus-prompt" placeholder="例: 桜の木の下で本を読む少女" class="w-full p-2 border rounded text-xs h-16"></textarea>
+                                    <div class="flex gap-2">
+                                        <button id="btn-gen-illus" class="flex-1 bg-indigo-600 text-white py-1 rounded text-xs">描く</button>
+                                        <button id="btn-close-illus" class="px-3 bg-gray-200 rounded text-xs">閉じる</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="visual-gallery-grid" class="grid grid-cols-4 gap-2">
+                            </div>
+                        </section>
+                    </div>
+
+                    <div id="tool-panel-settings" class="hidden space-y-6">
+                        <section class="bg-white p-4 rounded-xl shadow-sm">
+                            <h3 class="text-sm font-bold mb-2">登場人物・世界観</h3>
+                            <textarea id="input-world-settings" class="w-full p-2 border rounded text-sm h-20 mb-2" placeholder="世界観設定..."></textarea>
+                            <button id="btn-add-character" class="w-full py-1 bg-gray-100 rounded text-xs mb-2">+ 人物を追加</button>
+                            <div id="characters-list" class="space-y-1">
+                            </div>
+                        </section>
+                        <section class="bg-white p-4 rounded-xl shadow-sm">
+                            <button id="btn-export-txt" class="w-full py-3 flex items-center justify-center gap-2 text-indigo-600 font-bold bg-indigo-50 rounded-lg">
+                                <i data-lucide="file-text" class="w-4 h-4"></i> テキストファイルで書き出し
+                            </button>
+                            <button id="btn-delete-book" class="w-full py-3 flex items-center justify-center gap-2 text-red-600 font-bold bg-red-50 rounded-lg mt-4">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> この本を削除
+                            </button>
+                        </section>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex border-t bg-white safe-area-pb relative z-50 h-16 shrink-0">
+                <button id="tab-btn-tools" class="flex-1 flex flex-col items-center justify-center gap-1 text-gray-400">
+                    <i data-lucide="wand-2" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold">ツール</span>
+                </button>
+                <button id="tab-btn-write" class="flex-1 flex flex-col items-center justify-center gap-1 text-indigo-600">
+                    <i data-lucide="edit-3" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold">書く</span>
+                </button>
+                <button id="tab-btn-preview" class="flex-1 flex flex-col items-center justify-center gap-1 text-gray-400">
+                    <i data-lucide="eye" class="w-6 h-6"></i>
+                    <span class="text-[10px] font-bold">プレビュー</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="view-reader" class="view-section hidden fixed inset-0 z-50 bg-paper flex flex-col h-full">
+            
+            <div class="flex-1 overflow-x-auto overflow-y-hidden w-full pb-20">
+                <div id="reader-content-area" class="h-full font-serif text-lg leading-loose text-gray-800 py-10 px-6 writing-vertical-rl min-w-[100vw]">
+                    </div>
+            </div>
+
+            <audio id="audio-player" hidden></audio>
+
+            <div class="fixed bottom-0 left-0 right-0 bg-white border-t p-2 flex justify-around z-20 safe-area-pb">
+                <button id="btn-reader-library" class="flex flex-col items-center text-xs text-gray-500">
+                    <i data-lucide="library" class="w-5 h-5"></i> 書庫
+                </button>
+                <button id="btn-reader-quote" class="flex flex-col items-center text-xs text-gray-500">
+                    <i data-lucide="quote" class="w-5 h-5"></i> 名文
+                </button>
+                <button id="btn-reader-tts" class="flex flex-col items-center text-xs text-gray-500">
+                    <i data-lucide="headphones" class="w-5 h-5"></i> 朗読
+                </button>
+                <button id="btn-reader-chat" class="flex flex-col items-center text-xs text-gray-500">
+                    <i data-lucide="message-circle" class="w-5 h-5"></i> 対話
+                </button>
+            </div>
+
+            <div id="reader-chat-overlay" class="hidden fixed inset-0 z-30 bg-black/50 flex justify-end">
+                <div class="w-80 bg-white h-full shadow-xl flex flex-col animate-slide-in">
+                    <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                        <span class="font-bold">読者チャット</span>
+                        <button id="btn-close-chat" class="p-1 hover:bg-gray-200 rounded"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+                        </div>
+                    <div class="p-4 border-t flex gap-2 bg-white safe-area-pb">
+                        <input id="input-chat-message" class="flex-1 border rounded px-2 py-2 text-sm" placeholder="感想...">
+                        <button id="btn-send-chat" class="bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700">
+                            <i data-lucide="chevron-left" class="w-5 h-5 rotate-180"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-white/50 z-[100] flex items-center justify-center">
+        <i data-lucide="refresh-cw" class="w-10 h-10 animate-spin text-indigo-600"></i>
+    </div>
+
+    <div id="error-toast" class="hidden fixed bottom-24 left-4 right-4 bg-red-600 text-white p-3 rounded-lg shadow-lg z-[100] text-sm flex justify-between items-center animate-slide-in">
+        <span id="error-message">Error</span>
+        <button id="btn-close-error"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+
+    <div id="image-preview-modal" class="hidden fixed inset-0 bg-black/90 z-[90] flex items-center justify-center p-4">
+        <img id="preview-modal-img" src="" alt="Preview" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+        <button id="btn-close-preview" class="absolute top-4 right-4 text-white bg-black/50 p-2 rounded-full">
+            <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+    </div>
+
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+            <div id="toc-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex justify-end transition-opacity duration-300">
+        <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-slide-in">
+            <div class="flex items-center justify-between p-4 border-b bg-gray-50">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-indigo-600"></i>
+                    物語の構成
+                </h3>
+                <button id="btn-close-toc" class="p-2 hover:bg-gray-200 rounded-full text-gray-500">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-6">
+                
+                <section>
+                    <label class="text-xs font-bold text-gray-500 mb-2 block flex items-center gap-1">
+                        <i data-lucide="file-text" class="w-3 h-3"></i> あらすじ（物語の概要）
+                    </label>
+                    <textarea id="input-synopsis" class="w-full p-3 border rounded-lg text-sm leading-relaxed h-32 bg-gray-50 focus:bg-white transition-colors" placeholder="ここに物語のあらすじをメモしておけます..."></textarea>
+                </section>
+
+                <hr class="border-gray-200">
+
+                <section>
+                    <label class="text-xs font-bold text-gray-500 mb-2 block flex items-center gap-1">
+                        <i data-lucide="list" class="w-3 h-3"></i> 目次（タップして移動）
+                    </label>
+                    <div id="toc-list" class="space-y-2">
+                        </div>
+                </section>
+            </div>
+        </div>
+    </div>
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-4">
+            <div class="flex justify-between items-center mb-4 border-b pb-2">
+                <h3 class="font-bold text-lg">設定</h3>
+                <button id="btn-close-settings" class="hover:bg-gray-100 p-1 rounded"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <span class="text-sm">APIキー設定</span>
+                    <input id="input-api-key" type="password" placeholder="API Key" class="border rounded p-1 text-xs w-32">
+                </div>
+                <button id="btn-reset-app" class="w-full p-3 text-red-600 border border-red-200 rounded hover:bg-red-50 font-bold text-sm">
+                    全データを初期化
+                </button>
+            </div>
+        </div>
+    </div>
 <script>
 /**
  * ==============================================================================
