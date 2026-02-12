@@ -1335,8 +1335,8 @@ function openReader(bookId) {
     switchView('reader');
 }
 
-/**
- * 縦書きテキストの描画（目次リンク・字下げ対応版）
+       /**
+ * 縦書きテキストの描画（改行・字下げ・目次リンク・セクション分け対応）
  */
 function renderVerticalText(container, content, illustrations) {
     if (!content) {
@@ -1350,33 +1350,85 @@ function renderVerticalText(container, content, illustrations) {
     const lines = content.split('\n');
     let htmlContent = '';
     
-    // 目次エリアかどうかの判定フラグ
+    // セクション判定用のフラグ
     let inTocArea = false;
+    let inSynopsisArea = false;
     
     lines.forEach(line => {
         const text = line.trim();
-        if (!text) return; // 空行は無視（CSSのマージンで調整するため）
+
+        // 空行の処理：適度な隙間（改行）を作る
+        if (!text) {
+            htmlContent += '<div style="height: 1.5em; min-width: 1em;"></div>';
+            return;
+        }
 
         // --- 挿絵の処理 ---
         const imgMatch = text.match(/\[挿絵:(.+?)\]/);
         if (imgMatch) {
             const imgId = imgMatch[1];
             const imgData = illustrations?.find(img => img.id === imgId);
-            if (imgData) {
-                htmlContent += `<div class="vertical-image-container"><img src="${imgData.data}"></div>`;
-            }
+            if (imgData) htmlContent += `<div class="vertical-image-container"><img src="${imgData.data}"></div>`;
             return;
         }
 
-        // --- 目次・見出しの判定ロジック ---
-        
-        // 「【目次】」という文字を見つけたら目次エリア開始
-        if (text.includes('【目次】') || text.includes('■目次')) {
+        // --- セクション（あらすじ・目次）の開始判定 ---
+        if (text.includes('【あらすじ】')) {
+            inSynopsisArea = true;
+            inTocArea = false;
+            htmlContent += `<h3 class="font-bold text-xl mb-6 mt-10 border-b-2 border-indigo-200 pb-2" style="writing-mode: vertical-rl;">【あらすじ】</h3>`;
+            return;
+        }
+        if (text.includes('【目次】')) {
+            inSynopsisArea = false;
             inTocArea = true;
-            htmlContent += `<h3 class="font-bold text-lg mb-4 mt-8">【目次】</h3>`;
+            htmlContent += `<h3 class="font-bold text-xl mb-6 mt-10 border-b-2 border-indigo-200 pb-2" style="writing-mode: vertical-rl;">【目次】</h3>`;
             return;
         }
         
+        // 章タイトル（第〇話など）を見つけたら、あらすじ・目次エリアは強制終了
+        const isChapterHeader = text.length < 40 && (
+            text.match(/^第[0-9０-９]+[話章]/) || 
+            text.match(/^[Cc]hapter/) || 
+            text.match(/^タイトル[:：]/) ||
+            text.match(/^[0-9]+[話章.]/)
+        );
+
+        if (isChapterHeader && !text.includes('予定')) {
+            inTocArea = false;
+            inSynopsisArea = false;
+            // ジャンプ用のIDを付与
+            const linkId = "ch-" + text.replace(/^[・●\s]+/, '').replace(/\s+/g, '-');
+            htmlContent += `<p id="${linkId}" class="chapter-title">${text}</p>`;
+            return;
+        }
+
+        // --- 実際の表示（エリアごとにデザインを切り替え） ---
+
+        if (inTocArea) {
+            // 目次リンク：タップして移動できるようにする
+            const linkTargetId = "ch-" + text.replace(/^[・●\s]+/, '').replace(/\s+/g, '-');
+            htmlContent += `<p class="mb-4"><a onclick="const target = document.getElementById('${linkTargetId}'); if(target) target.scrollIntoView({behavior: 'smooth', inline: 'start'})" class="toc-link">${text}</a></p>`;
+        } 
+        else if (inSynopsisArea) {
+            // あらすじ：少し小さい文字で、字下げなし
+            htmlContent += `<p class="text-sm text-gray-600 leading-relaxed mb-6" style="text-indent: 0;">${text}</p>`;
+        } 
+        else {
+            // --- 通常の本文（字下げ適用） ---
+            // 会話文（「」や（）など）は字下げしない、それ以外は一文字下げる
+            if (text.match(/^[「『（【\[\(]/)) {
+                htmlContent += `<p class="novel-paragraph" style="text-indent: 0;">${text}</p>`;
+            } else {
+                // CSSの .novel-paragraph で定義した text-indent: 1em が効きます
+                htmlContent += `<p class="novel-paragraph">${text}</p>`;
+            }
+        }
+    });
+    
+    container.innerHTML = htmlContent;
+}
+ 
         // 「第1話」などの章タイトルっぽい行
         // 条件：短い（40文字以下）かつ、「第〇話」や「Chapter」などを含む
         const isChapterHeader = text.length < 40 && (
