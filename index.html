@@ -1,38 +1,38 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>言の葉 - Kotonoha</title>
     
-    <link rel="manifest" href="manifest.json" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css" />
+    <!-- PWA設定 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="言の葉">
 
-    <!-- ライブラリ設定 -->
-    <script type="importmap">
-    {
-        "imports": {
-            "react": "https://esm.sh/react@18.2.0",
-            "react-dom": "https://esm.sh/react-dom@18.2.0",
-            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-            "lucide-react": "https://esm.sh/lucide-react@0.284.0"
-        }
-    }
-    </script>
-    <!-- JSX変換用 -->
+    <!-- デザイン用ライブラリ -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- リアクト（心臓部）の準備 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- アイコンの準備 -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- JSXをブラウザで動かすための翻訳機 -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- メインプログラムの読み込み -->
-    <!-- type="text/babel" と data-type="module" が重要です -->
-    <script type="text/babel" data-type="module" src="src/main.jsx"></script>
+    <!-- アプリのプログラムを読み込み -->
+    <!-- 注意: src="app.js" で外部ファイルを読み込みます -->
+    <script type="text/babel" src="app.js"></script>
 
+    <!-- サービスワーカー（インストール用） -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -42,5 +42,3 @@
     </script>
 </body>
 </html>
-
-
