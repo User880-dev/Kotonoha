@@ -1062,55 +1062,96 @@ function renderVisualGallery() {
 
 async function handleAIWrite(type) {
     saveCurrentBook();
-    const prompt = document.getElementById('input-ai-prompt').value;
-    const mainG = document.getElementById('select-genre-main').value;
-    const subG = document.getElementById('select-genre-sub').value;
+    const promptInput = document.getElementById('input-ai-prompt').value.trim();
+    const targetLength = parseInt(document.getElementById('select-pages').value);
+    const roadmapInput = document.getElementById('input-roadmap').value.trim();
+    const scale = document.getElementById('select-scale').value;
     
-    // ★追加したセレクトボックスから「執筆量」を取得します
-    const targetLength = document.getElementById('select-pages').value;
+    // 物語の進行状況を管理する変数を準備（なければ初期化）
+    if (activeBook.currentChapter === undefined) activeBook.currentChapter = 0;
     
-    const genreText = subG ? `${mainG}（${subG}）` : mainG;
-    activeBook.genre = genreText;
-
     showLoading(true);
     try {
-        let systemPrompt = "あなたはプロの小説家です。美しい日本語で、感情豊かに物語を書いてください。出力はMarkdownではなくプレーンテキストで。";
-        // ★AIに「この文字数で書いてね」というルールを伝えます
-        systemPrompt += `\n指示された文字数（約${targetLength}文字）を厳守してください。`;
-
-        if (activeBook.characters.length > 0) systemPrompt += `\n\n【登場人物設定】\n${JSON.stringify(activeBook.characters)}`;
-        if (activeBook.worldSettings) systemPrompt += `\n\n【世界観】\n${activeBook.worldSettings}`;
-
+        let systemPrompt = "あなたは世界的なベストセラー作家です。Markdownは使わずプレーンテキストで書いてください。";
         let userPrompt = "";
-        if (type === 'new') {
-            userPrompt = `ジャンル「${genreText}」で、次の要素を含む物語の冒頭を、約${targetLength}文字で書いてください: ${prompt}。タイトルも提案してください（形式: タイトル: [タイトル]）。`;
-        } else {
-            systemPrompt += " 既存の物語の続きを書いてください。";
-            userPrompt = `これまでのあらすじ（直近）:\n${activeBook.content.slice(-1500)}\n\n指示: 続きを約${targetLength}文字で書いてください。展開案: ${prompt}`;
+
+        // --- A. 物語を新しく開始する場合 ---
+        if (type === 'new' && !roadmapInput) {
+            // スケールに合わせてランダムに全話数を決定
+            let min = 30, max = 60;
+            if (scale === 'short') { min = 15; max = 25; }
+            if (scale === 'epic') { min = 80; max = 120; }
+            const total = Math.floor(Math.random() * (max - min + 1)) + min;
+            
+            activeBook.totalChapters = total; 
+            activeBook.currentChapter = 1;
+
+            systemPrompt += `\nあなたは今、全${total}話で完結する壮大な物語を構想しました。まず全話のタイトルと要約（設計図）を作成してください。`;
+            userPrompt = `テーマ: ${promptInput || "究極の物語"}\nジャンル: ${activeBook.genre}\n形式: 1話: [要約], 2話: ... と${total}話分をリストアップしてください。`;
+            
+            const roadmap = await generateText(userPrompt, systemPrompt);
+            document.getElementById('input-roadmap').value = roadmap;
+            activeBook.worldSettings = roadmap;
+
+            // そのまま第1話を執筆
+            userPrompt = `作成した設計図に基づき、物語の幕開けとなる「第1話」を約${targetLength}文字で執筆してください。まず最初に「タイトル: [作品名]」を提案してください。`;
+        } 
+        // --- B. 続きを書く場合（カウントダウン） ---
+        else {
+            activeBook.currentChapter++;
+            const remaining = activeBook.totalChapters - activeBook.currentChapter;
+            
+            systemPrompt += `\n全${activeBook.totalChapters}話のうち、現在は第${activeBook.currentChapter}話を執筆中です。
+以下の【設計図】に従い、物語を深めてください。\n【設計図】\n${roadmapInput}`;
+            
+            if (remaining === 0) {
+                systemPrompt += "\n【重要】これが最終回です。すべての伏線を回収し、最高のエンディングで物語を完結させてください。";
+            }
+
+            userPrompt = `直近の展開:\n${activeBook.content.slice(-2000)}\n\n指示: 設計図の第${activeBook.currentChapter}話を約${targetLength}文字で描写してください。`;
         }
 
         const text = await generateText(userPrompt, systemPrompt);
         
+        // テキスト反映
         if (type === 'new') {
             const titleMatch = text.match(/タイトル[:：]\s*(.+)/);
             if (titleMatch) {
                 activeBook.title = titleMatch[1].trim();
                 activeBook.content = text.replace(titleMatch[0], '').trim();
                 document.getElementById('input-book-title').value = activeBook.title;
-            } else {
-                activeBook.content = text;
-            }
+            } else { activeBook.content = text; }
         } else {
             activeBook.content += "\n\n" + text;
         }
         
+        // UI更新
+        updateContinueButton();
         document.getElementById('textarea-content').value = activeBook.content;
         saveData();
         switchWriterTab('write'); 
     } catch (e) {
-        showError(e.message);
+        showError("執筆エラー: " + e.message);
     } finally {
         showLoading(false);
+    }
+}
+
+/**
+ * 続きを書くボタンのテキストを「あと◯◯回」に更新する関数
+ */
+function updateContinueButton() {
+    const btn = document.getElementById('btn-ai-write-continue');
+    if (activeBook && activeBook.totalChapters) {
+        const remaining = activeBook.totalChapters - (activeBook.currentChapter || 0);
+        if (remaining > 0) {
+            btn.innerHTML = `<i data-lucide="more-horizontal" class="w-3 h-3"></i> あと${remaining}回書く`;
+            btn.disabled = false;
+        } else {
+            btn.innerHTML = `<i data-lucide="check-circle" class="w-3 h-3"></i> 物語は完結しました`;
+            btn.disabled = true;
+        }
+        lucide.createIcons();
     }
 }
 
