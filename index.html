@@ -1269,11 +1269,43 @@ function setupEventListeners() {
     };
 
     // Writer: Header
+        // --- 省略 ---
+    document.getElementById('btn-close-settings').onclick = () => document.getElementById('settings-modal').classList.add('hidden');
+    // ...中略...
+
+    // ★ここからが貼り換えた部分
+    // Writer: Header
     document.getElementById('btn-writer-back').onclick = () => {
         saveCurrentBook();
-        if(confirm("書庫に戻りますか？")) { switchView('library'); renderLibrary(); }
+        // 内容が空で、かつタイトルがデフォルトのままなら削除して戻る
+        if (!activeBook.content.trim() && activeBook.title === "無題の物語") {
+            books = books.filter(b => b.id !== activeBook.id);
+            saveData();
+            switchView('library');
+            renderLibrary();
+        } else {
+            if(confirm("書庫に戻りますか？")) { 
+                switchView('library'); 
+                renderLibrary(); 
+            }
+        }
     };
-    document.getElementById('btn-writer-finish').onclick = () => { saveCurrentBook(); switchView('library'); renderLibrary(); };
+
+    document.getElementById('btn-writer-finish').onclick = () => { 
+        saveCurrentBook(); 
+        // 内容が空で、かつタイトルがデフォルトのままなら削除して戻る
+        if (!activeBook.content.trim() && activeBook.title === "無題の物語") {
+            books = books.filter(b => b.id !== activeBook.id);
+        }
+        saveData();
+        switchView('library'); 
+        renderLibrary(); 
+    };
+    // ★ここまで
+
+    // Writer: Tabs
+    document.getElementById('tab-btn-write').onclick = () => switchWriterTab('write');
+    // --- 省略 ---
 
     // Writer: Tabs
     document.getElementById('tab-btn-write').onclick = () => switchWriterTab('write');
