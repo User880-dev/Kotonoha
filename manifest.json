@@ -12,8 +12,8 @@
   "start_url": "./index.html",
   "display": "standalone",
   "theme_color": "#4f46e5",
-  "background_color": "#fdfbf7",
+  "background_color": "#f3f4f6",
   "lang": "ja",
-  "description": "AIと共に物語を紡ぎ、美しい縦書きで読書を楽しむ"
+  "description": "AIと共に紡ぎ、縦書きで楽しむ文芸体験"
 }
 
