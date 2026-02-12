@@ -270,34 +270,54 @@ body {
                         <button id="tool-subtab-settings" class="flex-1 py-1 text-xs rounded-md transition-all">設定・出力</button>
                     </div>
 
-                    <div id="tool-panel-ai" class="space-y-6">
+                                        <div id="tool-panel-ai" class="space-y-6">
                         <section class="bg-white p-4 rounded-xl shadow-sm">
                             <h3 class="text-sm font-bold mb-2 flex items-center gap-2"><i data-lucide="feather" class="w-4 h-4"></i> AIと一緒に書く</h3>
+                            
                             <div class="flex gap-2 mb-2">
                                 <select id="select-genre-main" class="flex-1 p-2 border rounded text-xs bg-white"></select>
                                 <select id="select-genre-sub" class="flex-1 p-2 border rounded text-xs bg-white">
                                     <option value="">（詳細なし）</option>
                                 </select>
                             </div>
+
                             <div class="mb-2">
-    <label class="text-[10px] text-gray-500 mb-1 block">執筆量の目安</label>
-    <select id="select-pages" class="w-full p-2 border rounded text-xs bg-white">
-        <option value="400">約1ページ (400文字程度)</option>
-        <option value="800" selected>約2ページ (800文字程度)</option>
-        <option value="1600">約4ページ (1600文字程度)</option>
-        <option value="4000">約10ページ (4000文字程度)</option>
-    </select>
-</div>
+                                <label class="text-[10px] text-gray-500 mb-1 block">物語の規模（スケール）</label>
+                                <select id="select-scale" class="w-full p-2 border rounded text-xs bg-white">
+                                    <option value="short">中編小説（15〜25話程度）</option>
+                                    <option value="standard" selected>長編小説（30〜60話程度）</option>
+                                    <option value="epic">超大作シリーズ（80〜120話程度）</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="text-[10px] text-gray-500 mb-1 block">1回あたりの執筆量</label>
+                                <select id="select-pages" class="w-full p-2 border rounded text-xs bg-white">
+                                    <option value="400">サクサク（約400文字）</option>
+                                    <option value="800" selected>標準（約800文字）</option>
+                                    <option value="1600">じっくり（約1600文字）</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4 bg-gray-100 p-3 rounded-lg border border-gray-200">
+                                <label class="text-[10px] font-bold text-gray-600 mb-2 block flex items-center gap-1">
+                                    <i data-lucide="map" class="w-3 h-3"></i> 運命の設計図（構成案）
+                                </label>
+                                <textarea id="input-roadmap" class="w-full p-2 border rounded text-[10px] h-32 font-mono leading-relaxed bg-white" 
+                                    placeholder="物語を開始すると、ここに全話の構成が自動生成されます。"></textarea>
+                            </div>
 
                             <textarea id="input-ai-prompt" class="w-full p-2 border rounded text-sm h-20 mb-2" placeholder="次の展開やアイデア..."></textarea>
+                            
                             <div class="flex gap-2 mb-2">
                                 <button id="btn-ai-write-new" class="flex-1 bg-green-600 text-white py-2 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-green-700">
-                                    <i data-lucide="pen-tool" class="w-3 h-3"></i> 新規執筆
+                                    <i data-lucide="pen-tool" class="w-3 h-3"></i> 物語を開始する
                                 </button>
                                 <button id="btn-ai-write-continue" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-indigo-700 disabled:bg-gray-300">
                                     <i data-lucide="more-horizontal" class="w-3 h-3"></i> 続きを書く
                                 </button>
                             </div>
+                            
                             <button id="btn-ai-review" class="w-full bg-orange-100 text-orange-800 py-2 rounded-lg text-xs flex items-center justify-center gap-1">
                                 <i data-lucide="user" class="w-3 h-3"></i> AI編集者のレビュー
                             </button>
@@ -312,6 +332,22 @@ body {
                                     <input type="file" id="file-upload-cover" class="hidden" accept="image/*">
                                 </label>
                             </div>
+
+                            <div id="illustration-control-area" class="mb-4">
+                                <button id="btn-show-illus-input" class="w-full border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50">挿絵を追加</button>
+                                <div id="illus-input-container" class="hidden flex flex-col gap-2">
+                                    <textarea id="input-illus-prompt" placeholder="例: 桜の木の下で本を読む少女" class="w-full p-2 border rounded text-xs h-16"></textarea>
+                                    <div class="flex gap-2">
+                                        <button id="btn-gen-illus" class="flex-1 bg-indigo-600 text-white py-1 rounded text-xs">描く</button>
+                                        <button id="btn-close-illus" class="px-3 bg-gray-200 rounded text-xs">閉じる</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="visual-gallery-grid" class="grid grid-cols-4 gap-2">
+                                </div>
+                        </section>
+                    </div>
 
                             <div id="illustration-control-area" class="mb-4">
                                 <button id="btn-show-illus-input" class="w-full border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50">挿絵を追加</button>
@@ -1002,55 +1038,79 @@ function renderVisualGallery() {
 
 async function handleAIWrite(type) {
     saveCurrentBook();
-    const prompt = document.getElementById('input-ai-prompt').value;
-    const mainG = document.getElementById('select-genre-main').value;
-    const subG = document.getElementById('select-genre-sub').value;
+    const promptInput = document.getElementById('input-ai-prompt').value.trim();
+    const roadmapInput = document.getElementById('input-roadmap').value.trim();
+    const scale = document.getElementById('select-scale').value;
     
-    // ★追加したセレクトボックスから「執筆量」を取得します
-    const targetLength = document.getElementById('select-pages').value;
+    // 現在の状態（何話目か）を管理
+    if (!activeBook.currentChapter) activeBook.currentChapter = 0;
     
-    const genreText = subG ? `${mainG}（${subG}）` : mainG;
-    activeBook.genre = genreText;
-
     showLoading(true);
     try {
-        let systemPrompt = "あなたはプロの小説家です。美しい日本語で、感情豊かに物語を書いてください。出力はMarkdownではなくプレーンテキストで。";
-        // ★AIに「この文字数で書いてね」というルールを伝えます
-        systemPrompt += `\n指示された文字数（約${targetLength}文字）を厳守してください。`;
-
-        if (activeBook.characters.length > 0) systemPrompt += `\n\n【登場人物設定】\n${JSON.stringify(activeBook.characters)}`;
-        if (activeBook.worldSettings) systemPrompt += `\n\n【世界観】\n${activeBook.worldSettings}`;
-
+        let systemPrompt = "あなたは天才小説家です。";
         let userPrompt = "";
-        if (type === 'new') {
-            userPrompt = `ジャンル「${genreText}」で、次の要素を含む物語の冒頭を、約${targetLength}文字で書いてください: ${prompt}。タイトルも提案してください（形式: タイトル: [タイトル]）。`;
-        } else {
-            systemPrompt += " 既存の物語の続きを書いてください。";
-            userPrompt = `これまでのあらすじ（直近）:\n${activeBook.content.slice(-1500)}\n\n指示: 続きを約${targetLength}文字で書いてください。展開案: ${prompt}`;
+
+        // --- A. 新しく物語を始める（設計図作成） ---
+        if (type === 'new' && !roadmapInput) {
+            // スケールに合わせてランダムに話数を決定（例: 30〜60話）
+            let min = 30, max = 60;
+            if (scale === 'short') { min = 15; max = 25; }
+            if (scale === 'epic') { min = 80; max = 120; }
+            
+            const total = Math.floor(Math.random() * (max - min + 1)) + min;
+            activeBook.totalChapters = total; // 全話数を保存
+            activeBook.currentChapter = 1;    // 1話目から開始
+
+            systemPrompt += `\n全${total}話の重厚な長編を構想しました。まず全話のタイトルと要約（設計図）を書いてください。`;
+            userPrompt = `テーマ: ${promptInput || "最高の物語"}\n形式: 1話: [要約]... で${total}話分。`;
+            
+            const roadmap = await generateText(userPrompt, systemPrompt);
+            document.getElementById('input-roadmap').value = roadmap;
+            activeBook.worldSettings = roadmap;
+
+            userPrompt = `設計図の「第1話」を執筆してください。タイトルも提案してください。`;
+        } 
+        // --- B. 続きを書く（カウントダウン） ---
+        else {
+            activeBook.currentChapter++;
+            const remaining = activeBook.totalChapters - activeBook.currentChapter;
+            
+            systemPrompt += `\n全${activeBook.totalChapters}話のうち、現在は第${activeBook.currentChapter}話を執筆中です。`;
+            if (remaining === 0) systemPrompt += "【重要】これが最終回です。物語を完璧に完結させてください。";
+
+            userPrompt = `これまでの内容を汲み取り、設計図の第${activeBook.currentChapter}話を執筆してください。`;
         }
 
         const text = await generateText(userPrompt, systemPrompt);
         
+        // テキスト反映処理（中略）
         if (type === 'new') {
             const titleMatch = text.match(/タイトル[:：]\s*(.+)/);
-            if (titleMatch) {
-                activeBook.title = titleMatch[1].trim();
-                activeBook.content = text.replace(titleMatch[0], '').trim();
-                document.getElementById('input-book-title').value = activeBook.title;
-            } else {
-                activeBook.content = text;
-            }
-        } else {
-            activeBook.content += "\n\n" + text;
-        }
+            if (titleMatch) { activeBook.title = titleMatch[1].trim(); activeBook.content = text.replace(titleMatch[0], '').trim(); }
+            else { activeBook.content = text; }
+        } else { activeBook.content += "\n\n" + text; }
+
+        // ★ボタンのテキストを「あと◯◯回」に書き換える
+        updateContinueButton();
         
         document.getElementById('textarea-content').value = activeBook.content;
         saveData();
         switchWriterTab('write'); 
-    } catch (e) {
-        showError(e.message);
-    } finally {
-        showLoading(false);
+    } catch (e) { showError(e.message); } finally { showLoading(false); }
+}
+
+// ボタンの文字を更新する関数
+function updateContinueButton() {
+    const btn = document.getElementById('btn-ai-write-continue');
+    if (activeBook && activeBook.totalChapters) {
+        const remaining = activeBook.totalChapters - (activeBook.currentChapter || 0);
+        if (remaining > 0) {
+            btn.innerHTML = `<i data-lucide="more-horizontal"></i> あと${remaining}回書く`;
+        } else {
+            btn.innerHTML = `<i data-lucide="check-circle"></i> 完結しました`;
+            btn.disabled = true;
+        }
+        lucide.createIcons();
     }
 }
 
