@@ -1,118 +1,94 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>言の葉書庫 (Kotonoha Library)</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/lucide@latest"></script>
+/* --- 1. 基本設定とフォント --- */
+body {
+    font-family: 'Shippori Mincho', 'Times New Roman', serif;
+    touch-action: manipulation;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+    background-color: #f3f4f6;
+}
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { serif: ['"Shippori Mincho"', 'serif'] },
-                    colors: { paper: '#fdfbf7' }
-                }
-            }
-        }
-    </script>
+/* スクロールバー非表示（アプリ風） */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    <style>
-        /* 基本リセット */
-        body {
-            font-family: 'Shippori Mincho', 'Times New Roman', serif;
-            touch-action: manipulation;
-            -webkit-font-smoothing: antialiased;
-            overscroll-behavior-y: none;
-            background-color: #f3f4f6;
-        }
-        /* スクロールバー非表示 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* --- 2. 縦書きと小説レイアウト --- */
+.writing-vertical-rl {
+    writing-mode: vertical-rl;
+    -webkit-writing-mode: vertical-rl;
+    text-orientation: upright;
+    -webkit-text-orientation: upright;
+}
 
-        /* 縦書き設定 */
-        .writing-vertical-rl {
-            writing-mode: vertical-rl;
-            -webkit-writing-mode: vertical-rl;
-            text-orientation: upright;
-            -webkit-text-orientation: upright;
-        }
+/* 小説の本文：1文字下げ・読みやすい行間 */
+.novel-paragraph {
+    text-indent: 1em;    /* 文頭の1文字下げ */
+    line-height: 2.2;    /* ゆったりした行間 */
+    margin-left: 0.5em;  /* 段落ごとの隙間 */
+    text-align: justify; /* 文字の端を揃える */
+}
 
-        /* 小説本文のレイアウト (一文字下げ・行間) */
-        .novel-paragraph {
-            text-indent: 1em;
-            line-height: 2.2;
-            margin-left: 0.5em;
-            text-align: justify;
-        }
+/* 目次リンク：青色でタップ可能 */
+.toc-link {
+    color: #4f46e5;
+    text-decoration: none;
+    border-bottom: 1px dashed #a5b4fc;
+    cursor: pointer;
+    padding: 4px 0;
+    display: inline-block;
+}
 
-        /* 目次リンク */
-        .toc-link {
-            color: #4f46e5;
-            text-decoration: none;
-            border-bottom: 1px dashed #a5b4fc;
-            cursor: pointer;
-            padding: 4px 0;
-            display: inline-block;
-        }
+/* 章タイトル：大きく太く */
+.chapter-title {
+    font-weight: bold;
+    font-size: 1.3em;
+    margin: 3em 0 2em 0;
+    color: #1a1a1a;
+}
 
-        /* 章タイトル */
-        .chapter-title {
-            font-weight: bold;
-            font-size: 1.3em;
-            margin: 3em 0 2em 0;
-            color: #1a1a1a;
-        }
+/* あらすじエリア */
+.synopsis-text {
+    font-size: 0.95em;
+    color: #4b5563;
+    line-height: 1.8;
+    margin-left: 1em;
+}
 
-        /* あらすじ */
-        .synopsis-text {
-            font-size: 0.95em;
-            color: #4b5563;
-            line-height: 1.8;
-            margin-left: 1em;
-        }
+/* --- 3. アニメーション --- */
+@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-        /* アニメーション定義 */
-        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.animate-slide-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
+.animate-spin { animation: spin 1s linear infinite; }
 
-        .animate-slide-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .animate-fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
-        .animate-spin { animation: spin 1s linear infinite; }
+/* --- 4. コンポーネント装飾 --- */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
 
-        /* UI装飾 (ガラス効果・画像など) */
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .book-cover-hover { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
-        .book-cover-hover:active { transform: scale(0.95); }
-        
-        #loading-overlay { backdrop-filter: blur(4px); z-index: 9999; }
+.book-cover-hover {
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.book-cover-hover:active { transform: scale(0.95); }
 
-        .vertical-image-container {
-            writing-mode: horizontal-tb;
-            margin: 1rem 0.5rem;
-            display: inline-block;
-            vertical-align: middle;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            background: white;
-            padding: 8px;
-            border: 1px solid #e5e7eb;
-        }
-        .vertical-image-container img { max-width: 60vw; max-height: 50vh; object-fit: contain; }
+#loading-overlay { backdrop-filter: blur(4px); z-index: 9999; }
 
-        .safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 20px); }
-        .safe-area-pt { padding-top: env(safe-area-inset-top, 20px); }
-        
-        /* 画面切り替えトランジション */
-        .view-section { transition: opacity 0.3s ease, transform 0.3s ease; }
-    </style>
-</head>
-<body class="bg-[#f3f4f6] text-gray-900 min-h-screen overflow-hidden relative">
+.vertical-image-container {
+    writing-mode: horizontal-tb;
+    margin: 1rem 0.5rem;
+    display: inline-block;
+    vertical-align: middle;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    background: white;
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+}
+.vertical-image-container img { max-width: 60vw; max-height: 50vh; object-fit: contain; }
+
+/* スマホ セーフエリア対応 */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 20px); }
+.safe-area-pt { padding-top: env(safe-area-inset-top, 20px); }
