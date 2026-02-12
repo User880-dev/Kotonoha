@@ -279,6 +279,16 @@ body {
                                     <option value="">（詳細なし）</option>
                                 </select>
                             </div>
+                            <div class="mb-2">
+    <label class="text-[10px] text-gray-500 mb-1 block">執筆量の目安</label>
+    <select id="select-pages" class="w-full p-2 border rounded text-xs bg-white">
+        <option value="400">約1ページ (400文字程度)</option>
+        <option value="800" selected>約2ページ (800文字程度)</option>
+        <option value="1600">約4ページ (1600文字程度)</option>
+        <option value="4000">約10ページ (4000文字程度)</option>
+    </select>
+</div>
+
                             <textarea id="input-ai-prompt" class="w-full p-2 border rounded text-sm h-20 mb-2" placeholder="次の展開やアイデア..."></textarea>
                             <div class="flex gap-2 mb-2">
                                 <button id="btn-ai-write-new" class="flex-1 bg-green-600 text-white py-2 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-green-700">
