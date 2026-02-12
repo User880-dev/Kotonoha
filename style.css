@@ -6,18 +6,13 @@ body {
     background-color: #f3f4f6;
     font-family: 'Noto Sans JP', sans-serif;
     height: 100vh;
-    /* モバイルブラウザでのアドレスバー対策 */
-    height: -webkit-fill-available;
     overflow: hidden;
-    /* タップ時のハイライトを無効化 */
     -webkit-tap-highlight-color: transparent;
 }
 
-.font-serif {
-    font-family: 'Noto Serif JP', serif;
-}
+.font-serif { font-family: 'Noto Serif JP', serif; }
 
-/* 縦書きのスタイル定義 */
+/* 縦書きの魔法 */
 .writing-vertical {
     writing-mode: vertical-rl;
     text-orientation: upright;
@@ -25,49 +20,25 @@ body {
     height: 100%;
     min-width: 100vw;
     padding: 4rem 2rem;
-    /* 横スクロールを滑らかに */
-    overflow-x: auto;
-    overflow-y: hidden;
 }
 
-/* スクロールバーを隠す（見た目をスッキリさせるため） */
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
+/* スクロールバーを消して本のような見た目に */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* iPhoneのセーフエリア（ノッチやホームバー）対応 */
-.safe-area-pb {
-    padding-bottom: env(safe-area-inset-bottom);
-}
-.safe-area-pt {
-    padding-top: env(safe-area-inset-top);
-}
+/* iPhoneの画面の端（ノッチ）に対応 */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom); }
+.safe-area-pt { padding-top: env(safe-area-inset-top); }
 
 /* フェードインアニメーション */
-.animate-in {
-    animation: fadeIn 0.4s ease-out forwards;
-}
+.animate-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+/* スタンプが押されるときのアニメーション */
+.stamp-anim { animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+@keyframes stampIn { from { opacity: 0; transform: scale(3) rotate(-30deg); } to { opacity: 0.8; transform: scale(1) rotate(-10deg); } }
 
-/* スタンプが押される時のアニメーション */
-.stamp-anim {
-    animation: stampIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
-@keyframes stampIn {
-    from { opacity: 0; transform: scale(3) rotate(-30deg); }
-    to { opacity: 0.8; transform: scale(1) rotate(-10deg); }
-}
-
-/* テキストエリアのデフォルトスタイルをリセット */
+/* フォームのスタイル調整 */
 textarea {
     -webkit-appearance: none;
     border-radius: 0;
