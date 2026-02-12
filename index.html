@@ -234,14 +234,21 @@ body {
 
                 <div id="view-writing" class="view-section hidden fixed inset-0 z-50 bg-white flex flex-col h-full">
             
-            <div class="flex items-center justify-between p-2 border-b bg-white z-50 shadow-sm relative h-14 shrink-0">
-                <button id="btn-writer-back" class="flex items-center justify-center w-12 h-12 text-gray-600 hover:bg-gray-100 rounded-full cursor-pointer -ml-2">
-                    <i data-lucide="chevron-left" class="w-6 h-6"></i>
-                </button>
+                        <div class="flex items-center justify-between p-2 border-b bg-white z-50 shadow-sm relative h-14 shrink-0">
+                <div class="flex items-center">
+                    <button id="btn-writer-back" class="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-100 rounded-full cursor-pointer">
+                        <i data-lucide="chevron-left" class="w-6 h-6"></i>
+                    </button>
+                    <button id="btn-open-toc" class="flex items-center justify-center w-10 h-10 text-gray-600 hover:bg-gray-100 rounded-full cursor-pointer ml-1" title="目次とあらすじ">
+                        <i data-lucide="list" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
                 <div class="flex-1 mx-2 min-w-0">
                     <input id="input-book-title" type="text" class="w-full text-center font-bold bg-transparent border-none outline-none truncate text-lg p-1" placeholder="タイトル">
                 </div>
-                <button id="btn-writer-finish" class="flex items-center justify-center w-12 h-12 text-indigo-600 font-bold hover:bg-indigo-50 rounded-full cursor-pointer -mr-2">
+                
+                <button id="btn-writer-finish" class="flex items-center justify-center w-10 h-10 text-indigo-600 font-bold hover:bg-indigo-50 rounded-full cursor-pointer">
                     <i data-lucide="check" class="w-6 h-6"></i>
                 </button>
             </div>
@@ -446,6 +453,39 @@ body {
     </div>
 
     <div id="settings-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[80] p-4">
+            <div id="toc-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] flex justify-end transition-opacity duration-300">
+        <div class="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-slide-in">
+            <div class="flex items-center justify-between p-4 border-b bg-gray-50">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-indigo-600"></i>
+                    物語の構成
+                </h3>
+                <button id="btn-close-toc" class="p-2 hover:bg-gray-200 rounded-full text-gray-500">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-6">
+                
+                <section>
+                    <label class="text-xs font-bold text-gray-500 mb-2 block flex items-center gap-1">
+                        <i data-lucide="file-text" class="w-3 h-3"></i> あらすじ（物語の概要）
+                    </label>
+                    <textarea id="input-synopsis" class="w-full p-3 border rounded-lg text-sm leading-relaxed h-32 bg-gray-50 focus:bg-white transition-colors" placeholder="ここに物語のあらすじをメモしておけます..."></textarea>
+                </section>
+
+                <hr class="border-gray-200">
+
+                <section>
+                    <label class="text-xs font-bold text-gray-500 mb-2 block flex items-center gap-1">
+                        <i data-lucide="list" class="w-3 h-3"></i> 目次（タップして移動）
+                    </label>
+                    <div id="toc-list" class="space-y-2">
+                        </div>
+                </section>
+            </div>
+        </div>
+    </div>
         <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-4">
             <div class="flex justify-between items-center mb-4 border-b pb-2">
                 <h3 class="font-bold text-lg">設定</h3>
@@ -1124,6 +1164,86 @@ function updateContinueButton() {
     }
 }
 
+    // --- 目次機能 (Table of Contents) ---
+    
+    // 目次を開く
+    document.getElementById('btn-open-toc').onclick = () => {
+        const modal = document.getElementById('toc-modal');
+        const list = document.getElementById('toc-list');
+        const synopsisInput = document.getElementById('input-synopsis');
+        
+        // あらすじを読み込む
+        synopsisInput.value = activeBook.synopsis || "";
+        
+        // 目次を生成（本文から「第〇話」や「章」などを探す）
+        list.innerHTML = "";
+        const content = activeBook.content || "";
+        const lines = content.split('\n');
+        let foundChapter = false;
+
+        lines.forEach((line, index) => {
+            // 見出しっぽい行を判定（「第〇話」「Chapter」「タイトル:」など）
+            // 条件：短い行で、かつ特定のキーワードを含む
+            const isHeader = line.length < 50 && (
+                line.match(/^第[0-9０-９]+[話章]/) || 
+                line.match(/^[Cc]hapter/) || 
+                line.match(/^タイトル[:：]/) ||
+                line.match(/^[0-9]+[話章.]/)
+            );
+
+            if (isHeader) {
+                foundChapter = true;
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 rounded-lg hover:bg-indigo-50 text-sm border-b border-gray-100 flex items-center gap-2 group transition-all";
+                btn.innerHTML = `
+                    <span class="text-indigo-400 group-hover:text-indigo-600">●</span>
+                    <span class="font-medium text-gray-700 truncate">${line}</span>
+                `;
+                
+                // クリック時のジャンプ処理
+                btn.onclick = () => {
+                    // モーダルを閉じる
+                    modal.classList.add('hidden');
+                    
+                    // 執筆タブを表示
+                    switchWriterTab('write');
+                    
+                    // テキストエリアを取得してスクロール
+                    const textarea = document.getElementById('textarea-content');
+                    
+                    // 行の位置を計算（簡易的ですが高速です）
+                    // テキスト全体の先頭から、その行までの文字数を数える
+                    const position = lines.slice(0, index).join('\n').length;
+                    
+                    textarea.focus();
+                    textarea.setSelectionRange(position, position + line.length);
+                    
+                    // スクロール位置を調整（該当行が画面の中央に来るように）
+                    const lineHeight = 24; // およその行の高さ
+                    textarea.scrollTop = position / content.length * textarea.scrollHeight; 
+                };
+                list.appendChild(btn);
+            }
+        });
+
+        if (!foundChapter) {
+            list.innerHTML = `<div class="text-center text-gray-400 text-xs py-4">「第1話」や「タイトル:」などの見出しが見つかりません。<br>本文を書くとここに自動でリストアップされます。</div>`;
+        }
+        
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+    };
+
+    // 目次を閉じる
+    document.getElementById('btn-close-toc').onclick = () => {
+        // あらすじを保存
+        if (activeBook) {
+            activeBook.synopsis = document.getElementById('input-synopsis').value;
+            saveData();
+        }
+        document.getElementById('toc-modal').classList.add('hidden');
+    };
+        
 async function handleGenerateIllustration() {
     const prompt = document.getElementById('input-illus-prompt').value;
     if (!prompt) return alert("プロンプトを入力してください");
