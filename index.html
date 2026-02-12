@@ -694,33 +694,25 @@ const generateText = async (prompt, systemPrompt = "") => {
  * 画像生成関数 (最新の Gemini Image Generation モデル対応版)
  */
 const generateImage = async (prompt) => {
-    // 画像生成モデル専用のペイロード構造
     const payload = {
-        contents: [{ 
-            parts: [{ text: prompt }] 
-        }],
+        contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-            // "IMAGE" (大文字) を指定することで、画像バイナリを返すよう要求します
             responseModalities: ["IMAGE"]
         }
     };
 
     try {
-        // v1beta エンドポイントを使用
         const data = await apiCall(`https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:generateContent`, payload);
         
-        // 戻り値の中から画像データ (inlineData) を探す
         const parts = data.candidates?.[0]?.content?.parts || [];
         const imagePart = parts.find(p => p.inlineData && p.inlineData.mimeType.startsWith('image/'));
         
         if (imagePart && imagePart.inlineData) {
             return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
         }
-        
-        throw new Error("モデルから画像データが返されませんでした。");
+        throw new Error("画像データが見つかりません");
     } catch (e) {
-        // もし gemini-3 がダメなら、もう一つの候補に自動フォールバックする仕組み（任意）
-        console.error("Image generation failed:", e);
+        console.error("Image Gen Error:", e);
         throw e;
     }
 };
