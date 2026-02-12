@@ -23,7 +23,7 @@ body {
 .novel-paragraph {
     text-indent: 1em;    /* 文頭の1文字下げ */
     line-height: 2.2;    /* ゆったりした行間 */
-    margin-left: 0.5em;  /* 段落ごとの隙間 */
+    margin-left: 0.8em;  /* 段落ごとの隙間（縦書きなので左側） */
     text-align: justify; /* 文字の端を揃える */
 }
 
@@ -37,7 +37,7 @@ body {
     display: inline-block;
 }
 
-/* 章タイトル：大きく太く */
+/* 章タイトル */
 .chapter-title {
     font-weight: bold;
     font-size: 1.3em;
@@ -54,9 +54,18 @@ body {
 }
 
 /* --- 3. アニメーション --- */
-@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes slideInRight { 
+    from { transform: translateX(100%); opacity: 0; } 
+    to { transform: translateX(0); opacity: 1; } 
+}
+@keyframes fadeIn { 
+    from { opacity: 0; } 
+    to { opacity: 1; } 
+}
+@keyframes spin { 
+    from { transform: rotate(0deg); } 
+    to { transform: rotate(360deg); } 
+}
 
 .animate-slide-in { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
@@ -75,8 +84,7 @@ body {
 }
 .book-cover-hover:active { transform: scale(0.95); }
 
-#loading-overlay { backdrop-filter: blur(4px); z-index: 9999; }
-
+/* 縦書きモード時の画像コンテナ */
 .vertical-image-container {
     writing-mode: horizontal-tb;
     margin: 1rem 0.5rem;
@@ -87,8 +95,17 @@ body {
     padding: 8px;
     border: 1px solid #e5e7eb;
 }
-.vertical-image-container img { max-width: 60vw; max-height: 50vh; object-fit: contain; }
+.vertical-image-container img { 
+    max-width: 60vw; 
+    max-height: 50vh; 
+    object-fit: contain; 
+}
 
 /* スマホ セーフエリア対応 */
 .safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 20px); }
 .safe-area-pt { padding-top: env(safe-area-inset-top, 20px); }
+
+/* 画面切り替えの基本設定 */
+.view-section {
+    transition: opacity 0.3s ease;
+}
