@@ -1451,68 +1451,6 @@ function renderVerticalText(container, content, illustrations) {
     container.innerHTML = htmlContent;
 }
         
-function renderVerticalText(container, content, illustrations) {
-    if (!content) {
-        container.innerHTML = '<div class="text-gray-400 p-4">まだ白紙のようです...</div>';
-        return;
-    }
-
-    container.innerHTML = ''; 
-    const lines = content.split('\n');
-    let htmlContent = '';
-    
-    let inTocArea = false;
-    let inSynopsisArea = false;
-    
-    lines.forEach(line => {
-        const text = line.trim();
-
-        // 空行（改行）を「隙間」として表現
-        if (!text) {
-            htmlContent += '<div style="height: 100%; width: 1.5em; min-width: 1.5em;"></div>';
-            return;
-        }
-
-        // --- 挿絵 ---
-        const imgMatch = text.match(/\[挿絵:(.+?)\]/);
-        if (imgMatch) {
-            const imgId = imgMatch[1];
-            const imgData = illustrations?.find(img => img.id === imgId);
-            if (imgData) htmlContent += `<div class="vertical-image-container"><img src="${imgData.data}"></div>`;
-            return;
-        }
-
-        // --- 見出し判定 ---
-        if (text.includes('【あらすじ】')) { inSynopsisArea = true; inTocArea = false; htmlContent += `<h3 class="font-bold text-lg mb-4 mt-8">【あらすじ】</h3>`; return; }
-        if (text.includes('【目次】')) { inSynopsisArea = false; inTocArea = true; htmlContent += `<h3 class="font-bold text-lg mb-4 mt-8">【目次】</h3>`; return; }
-        
-        const isChapterHeader = text.length < 40 && (text.match(/^第[0-9０-９]+[話章]/) || text.match(/^タイトル[:：]/) || text.match(/^[0-9]+[話章.]/));
-
-        if (isChapterHeader && !text.includes('予定')) {
-            inTocArea = false; inSynopsisArea = false;
-            const linkId = "ch-" + text.replace(/[^\w\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, '-');
-            htmlContent += `<p id="${linkId}" class="chapter-title">${text}</p>`;
-            return;
-        }
-
-        // --- 表示ロジック ---
-        if (inTocArea) {
-            const linkTargetId = "ch-" + text.replace(/[^\w\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]+/g, '-');
-            htmlContent += `<p class="mb-2"><a onclick="const t=document.getElementById('${linkTargetId}'); if(t) t.scrollIntoView({behavior:'smooth', inline:'start'})" class="toc-link">${text}</a></p>`;
-        } 
-        else if (inSynopsisArea) {
-            htmlContent += `<p class="synopsis-text">${text}</p>`;
-        } 
-        else {
-            // 本文：CSSで text-indent: 1em をかけているので、ここではタグを付けるだけ
-            const style = text.match(/^[「『（【\[\(]/) ? 'style="text-indent: 0;"' : '';
-            htmlContent += `<p class="novel-paragraph" ${style}>${text}</p>`;
-        }
-    });
-    
-    container.innerHTML = htmlContent;
-}
-
 async function handleTTS() {
     if (isPlayingTTS) {
         audioPlayer.pause();
