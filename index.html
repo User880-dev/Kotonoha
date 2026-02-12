@@ -1,46 +1,48 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>言の葉 - Kotonoha</title>
     
-    <!-- PWA Settings -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="言の葉">
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     
-    <!-- Tailwind CSS (Design) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
 
-    <!-- Import Map: Reactやアイコンをビルドなしで使うための設定 -->
+    <!-- Reactをブラウザでそのまま動かすための設定 -->
     <script type="importmap">
     {
         "imports": {
-            "react": "https://esm.sh/react@18.2.0",
-            "react-dom": "https://esm.sh/react-dom@18.2.0",
-            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "react": "https://esm.sh/react@18.2.0?dev",
+            "react-dom": "https://esm.sh/react-dom@18.2.0?dev",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?dev",
             "lucide-react": "https://esm.sh/lucide-react@0.284.0"
         }
     }
     </script>
+    <!-- JSXをブラウザで変換するライブラリ -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
-    <!-- アプリが描画される場所 -->
     <div id="root"></div>
 
-    <!-- メインプログラムの読み込み -->
-    <script type="module" src="App.jsx"></script>
+    <!-- type="text/babel" にすることでJSXを解釈させます -->
+    <script type="text/babel" data-type="module">
+        import React from 'react';
+        import { createRoot } from 'react-dom/client';
+        import App from './App.jsx';
 
-    <!-- サービスワーカーの登録 (PWA用) -->
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(err => console.error('SW register error:', err));
+                navigator.serviceWorker.register('sw.js').catch(() => {});
             });
         }
     </script>
