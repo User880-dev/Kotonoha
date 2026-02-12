@@ -11,6 +11,28 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="言の葉">
 
+    <!-- デバッグ用：エラーを表示するスタイル -->
+    <style>
+        #error-display {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ffebeb;
+            color: #d93025;
+            font-family: monospace;
+            font-size: 10px;
+            padding: 10px;
+            z-index: 10000;
+            border-bottom: 2px solid #d93025;
+            display: none;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+    </style>
+
     <!-- デザイン用ライブラリ -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
@@ -26,17 +48,37 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
+    <!-- エラーが発生した時だけここに表示されます -->
+    <div id="error-display"></div>
     <div id="root"></div>
 
-    <!-- アプリのプログラムを読み込み -->
-    <!-- 注意: src="app.js" で外部ファイルを読み込みます -->
-    <script type="text/babel" src="app.js"></script>
+    <script>
+        // ブラウザ全体のエラーをキャッチして画面に表示する
+        window.onerror = function(msg, url, line, col, error) {
+            const display = document.getElementById('error-display');
+            display.style.display = 'block';
+            display.innerText += `\n[Error] ${msg}\nLine: ${line}\nURL: ${url}\n`;
+            return false;
+        };
 
-    <!-- サービスワーカー（インストール用） -->
+        // Promiseのエラー（API失敗など）もキャッチする
+        window.onunhandledrejection = function(event) {
+            const display = document.getElementById('error-display');
+            display.style.display = 'block';
+            display.innerText += `\n[Unhandled Rejection] ${event.reason}\n`;
+        };
+    </script>
+
+    <!-- アプリのメインプログラムを読み込み -->
+    <!-- type="text/babel" を指定してBabelで翻訳させます -->
+    <script type="text/babel" src="app.js" onerror="window.onerror('app.jsの読み込みに失敗しました。ファイル名が正しいか確認してください。')"></script>
+
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(() => {});
+                navigator.serviceWorker.register('sw.js').catch((err) => {
+                    console.log('SW registration failed: ', err);
+                });
             });
         }
     </script>
