@@ -165,6 +165,57 @@ body {
     max-height: 50vh;
     object-fit: contain;
 }
+
+/* --- 前にあるコードの最後 --- */
+.vertical-image-container img {
+    max-width: 60vw;
+    max-height: 50vh;
+    object-fit: contain;
+}
+
+/* ★ここに貼り付け！ */
+/* --- 小説本文のレイアウト設定 --- */
+.novel-paragraph {
+    text-indent: 1em; /* 文頭を一文字下げる */
+    margin-bottom: 0; /* 段落間を空けない設定（お好みで） */
+    line-height: 2.2; /* 行間をゆったり */
+    text-align: justify;
+}
+
+.toc-link {
+    text-decoration: none;
+    color: #4f46e5;
+    border-bottom: 1px dashed #a5b4fc;
+    cursor: pointer;
+    margin-left: 0.5em;
+}
+
+.chapter-title {
+    font-weight: bold;
+    font-size: 1.25em;
+    margin: 3em 0 2em 0;
+    color: #1a1a1a;
+    text-indent: 0;
+}
+
+</style> ```
+
+---
+
+### 💡 貼り付けたあとのヒント
+これで、あなたのアプリに「小説を美しく表示するためのルール（定義）」が読み込まれました。
+
+次は最後のステップ、**「このルールを実際の文章に適用させるためのJavaScript（Step 3）」**の書き換えですね。
+
+これが終われば、
+* 本文の「あらすじ」が読みやすくなり
+* 「目次」がタップできるリンクになり
+* 「地の文」が自動で一文字下がる
+
+という、理想の形が完成します！
+
+**最後の手順である「JavaScript（renderVerticalText関数）の書き換え」をご案内してもよろしいですか？**
+        
     </style>
     
     <script>
