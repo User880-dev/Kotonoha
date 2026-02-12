@@ -2,395 +2,47 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>言の葉 - Kotonoha</title>
     
-    <!-- 必要なライブラリを直接読み込みます (ビルド不要) -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/lucide-react@latest"></script>
-
+    <!-- PWA Settings -->
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="言の葉">
+    
+    <!-- Tailwind CSS (Design) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap');
-        
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #f3f4f6;
-            font-family: 'Noto Sans JP', sans-serif;
-            overflow: hidden;
+    <!-- Import Map: Reactやアイコンをビルドなしで使うための設定 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom": "https://esm.sh/react-dom@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.284.0"
         }
-
-        .font-serif {
-            font-family: 'Noto Serif JP', serif;
-        }
-
-        .writing-vertical {
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-        }
-
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        .safe-area-pb {
-            padding-bottom: env(safe-area-inset-bottom);
-        }
-
-        textarea {
-            -webkit-appearance: none;
-            border-radius: 0;
-            caret-color: #4f46e5;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateX(20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        .animate-in {
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-    </style>
+    }
+    </script>
 </head>
 <body>
+    <!-- アプリが描画される場所 -->
     <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
-        const { 
-            Book, PenTool, Library, Settings, Trash2, 
-            RefreshCw, Volume2, X, Check, Key,
-            ChevronLeft, Wand2, Dice5, Edit3, Feather, Sparkles, MessageCircle
-        } = lucideReact;
+    <!-- メインプログラムの読み込み -->
+    <script type="module" src="App.jsx"></script>
 
-        // --- ツール関数 ---
-        const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
-
-        const pcmToWav = (base64PCM) => {
-            const binaryString = window.atob(base64PCM);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-            const wavHeader = new ArrayBuffer(44);
-            const view = new DataView(wavHeader);
-            const writeString = (v, offset, string) => {
-                for (let i = 0; i < string.length; i++) v.setUint8(offset + i, string.charCodeAt(i));
-            };
-            writeString(view, 0, 'RIFF');
-            view.setUint32(4, 36 + binaryString.length, true);
-            writeString(view, 8, 'WAVE');
-            writeString(view, 12, 'fmt ');
-            view.setUint32(16, 16, true);
-            view.setUint16(20, 1, true);
-            view.setUint16(22, 1, true);
-            view.setUint32(24, 24000, true);
-            view.setUint32(28, 48000, true);
-            view.setUint16(32, 2, true);
-            view.setUint16(34, 16, true);
-            writeString(view, 36, 'data');
-            view.setUint32(40, binaryString.length, true);
-            return URL.createObjectURL(new Blob([view, bytes], { type: 'audio/wav' }));
-        };
-
-        const fetchFromGemini = async (url, payload, key) => {
-            const response = await fetch(`${url}?key=${key}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+    <!-- サービスワーカーの登録 (PWA用) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(err => console.error('SW register error:', err));
             });
-            if (!response.ok) {
-                const err = await response.json().catch(() => ({}));
-                throw new Error(err.error?.message || "API接続エラー");
-            }
-            return response.json();
-        };
-
-        const VerticalTextDisplay = ({ title, content }) => {
-            return (
-                <div className="h-full font-serif text-lg leading-loose text-gray-800 py-12 px-8 writing-vertical" style={{ columnGap: '2.5rem', height: '100%', minWidth: '100vw' }}>
-                    <h1 className="font-bold text-2xl ml-10 mt-10 mb-8">{title}</h1>
-                    <div className="whitespace-pre-wrap text-justify h-full ml-4">{content}</div>
-                </div>
-            );
-        };
-
-        // --- メインアプリ ---
-        function App() {
-            const [view, setView] = useState('library');
-            const [books, setBooks] = useState([]);
-            const [activeBookId, setActiveBookId] = useState(null);
-            const [showSettings, setShowSettings] = useState(false);
-            const [isDeleteMode, setIsDeleteMode] = useState(false);
-            const [apiKey, setApiKey] = useState("");
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState(null);
-
-            useEffect(() => {
-                const b = localStorage.getItem('kotonoha_books');
-                const k = localStorage.getItem('gemini_api_key');
-                if (b) setBooks(JSON.parse(b));
-                if (k) setApiKey(k);
-                
-                // サービスワーカーの登録
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('sw.js').catch(() => {});
-                }
-            }, []);
-
-            useEffect(() => { localStorage.setItem('kotonoha_books', JSON.stringify(books)); }, [books]);
-            useEffect(() => { localStorage.setItem('gemini_api_key', apiKey); }, [apiKey]);
-
-            const activeBook = useMemo(() => books.find(b => b.id === activeBookId), [books, activeBookId]);
-
-            const updateBook = (id, updates) => {
-                setBooks(prev => prev.map(b => b.id === id ? { ...b, ...updates, updatedAt: Date.now() } : b));
-            };
-
-            const generateText = async (prompt, sys = "プロの小説家として執筆してください。装飾抜きで本文のみを返してください。") => {
-                const payload = { 
-                    contents: [{ parts: [{ text: prompt }] }], 
-                    systemInstruction: { parts: [{ text: sys }] } 
-                };
-                const data = await fetchFromGemini(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, payload, apiKey);
-                return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            };
-
-            const generateSpeech = async (text) => {
-                const payload = { 
-                    contents: [{ parts: [{ text }] }], 
-                    generationConfig: { 
-                        responseModalities: ["AUDIO"], 
-                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } 
-                    } 
-                };
-                const data = await fetchFromGemini(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, payload, apiKey);
-                return data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-            };
-
-            if (!apiKey) {
-                return (
-                    <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-6">
-                        <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full text-center">
-                            <Key className="w-12 h-12 text-indigo-600 mx-auto mb-4" />
-                            <h1 className="text-xl font-bold mb-2">鍵をお持ちですか？</h1>
-                            <p className="text-gray-500 text-sm mb-8 leading-relaxed">
-                                このアプリを動かすにはGoogle GeminiのAPIキーが必要です。キーはブラウザにのみ安全に保存されます。
-                            </p>
-                            <input 
-                                type="password" 
-                                placeholder="APIキーを入力" 
-                                className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl mb-4 outline-none text-center focus:ring-2 focus:ring-indigo-300 transition-all" 
-                                onBlur={e => e.target.value && setApiKey(e.target.value)} 
-                            />
-                            <p className="text-[10px] text-gray-400">※入力後に枠の外をタップして確定してください</p>
-                        </div>
-                    </div>
-                );
-            }
-
-            const LibraryView = () => (
-                <div className="p-6 max-w-6xl mx-auto min-h-screen pb-24">
-                    <header className="flex justify-between items-center mb-10 bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-sm sticky top-4 z-10">
-                        <h1 className="text-2xl font-serif font-bold text-gray-800 flex items-center gap-2">
-                            <Library className="text-indigo-600 w-6 h-6" />言の葉書庫
-                        </h1>
-                        <button onClick={() => setShowSettings(true)} className="p-2 bg-gray-100 rounded-full active:scale-90 transition-transform"><Settings className="w-6 h-6 text-gray-600"/></button>
-                    </header>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        <div onClick={() => {
-                            const id = generateId();
-                            const newBook = { id, title: "無題の物語", content: "", genre: "未設定", createdAt: Date.now() };
-                            setBooks([newBook, ...books]);
-                            setActiveBookId(id);
-                            setView('write');
-                        }} className="aspect-[2/3] border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-white/50 text-indigo-600 active:scale-95 transition-all shadow-sm">
-                            <PenTool className="w-10 h-10 mb-2"/>
-                            <span className="text-xs font-bold font-serif">新しく紡ぐ</span>
-                        </div>
-                        {books.map(book => (
-                            <div key={book.id} onClick={() => { setActiveBookId(book.id); setView('read'); }} className="aspect-[2/3] bg-white rounded-2xl shadow-md border-l-8 border-gray-800 p-4 relative overflow-hidden active:scale-95 transition-all">
-                                <span className="font-serif text-lg leading-relaxed writing-vertical h-full block">{book.title}</span>
-                                {isDeleteMode && (
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); setBooks(books.filter(b => b.id !== book.id)); }} 
-                                        className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full shadow-lg z-20"
-                                    >
-                                        <X className="w-4 h-4"/>
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            const WritingDesk = () => {
-                const [tab, setTab] = useState('write');
-                const [prompt, setPrompt] = useState("");
-                const [genning, setGenning] = useState(false);
-
-                const handleGen = async (type) => {
-                    if (type === 'new' && !prompt) return;
-                    setGenning(true);
-                    try {
-                        const text = await generateText(type === 'new' ? prompt : `以下の続きを書いてください:\n${activeBook.content.slice(-600)}`);
-                        updateBook(activeBook.id, { content: type === 'new' ? text : activeBook.content + "\n\n" + text });
-                        if (type === 'new') setTab('write');
-                    } catch (e) { setError(e.message); }
-                    setGenning(false);
-                };
-
-                return (
-                    <div className="flex flex-col h-screen bg-white overflow-hidden animate-in">
-                        <div className="h-14 border-b flex items-center px-4 justify-between bg-white z-20 shrink-0">
-                            <button onClick={() => setView('library')} className="p-2 active:bg-gray-100 rounded-full"><ChevronLeft/></button>
-                            <input 
-                                value={activeBook.title} 
-                                onChange={e => updateBook(activeBook.id, { title: e.target.value })} 
-                                className="flex-1 text-center font-bold font-serif outline-none mx-2 text-lg truncate" 
-                            />
-                            <button onClick={() => setView('library')} className="text-indigo-600 p-2 font-bold active:bg-indigo-50 rounded-lg"><Check/></button>
-                        </div>
-                        <div className="flex-1 overflow-hidden relative">
-                            {tab === 'write' ? (
-                                <textarea 
-                                    value={activeBook.content} 
-                                    onChange={e => updateBook(activeBook.id, { content: e.target.value })} 
-                                    className="w-full h-full p-6 font-serif text-lg leading-loose outline-none pb-24 resize-none" 
-                                    placeholder="ここに物語を..." 
-                                />
-                            ) : (
-                                <div className="p-4 space-y-4 h-full bg-gray-50 overflow-y-auto pb-24">
-                                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                                        <h3 className="text-sm font-bold mb-3 flex items-center gap-2 text-gray-600"><Feather className="w-4 h-4" /> AI執筆助手</h3>
-                                        <textarea 
-                                            value={prompt} 
-                                            onChange={e => setPrompt(e.target.value)} 
-                                            placeholder="「雨の降る駅での再会」など、書きたいシーンを教えてください" 
-                                            className="w-full p-4 bg-gray-50 border border-gray-100 rounded-xl h-36 mb-4 outline-none focus:ring-2 focus:ring-indigo-100 text-sm" 
-                                        />
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleGen('new')} disabled={genning} className="flex-1 bg-green-600 text-white py-4 rounded-xl font-bold active:scale-95 transition-all shadow-md">新しく書く</button>
-                                            <button onClick={() => handleGen('cont')} disabled={genning || !activeBook.content} className="flex-1 bg-indigo-600 text-white py-4 rounded-xl font-bold active:scale-95 transition-all shadow-md disabled:bg-gray-300">続きを書く</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="h-16 border-t flex items-center justify-around bg-white shrink-0 safe-area-pb">
-                            <button onClick={() => setTab('tools')} className={`flex flex-col items-center gap-1 flex-1 ${tab === 'tools' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                <Wand2 className="w-5 h-5"/><span className="text-[10px] font-bold">ツール</span>
-                            </button>
-                            <button onClick={() => setTab('write')} className={`flex flex-col items-center gap-1 flex-1 ${tab === 'write' ? 'text-indigo-600' : 'text-gray-400'}`}>
-                                <Edit3 className="w-5 h-5"/><span className="text-[10px] font-bold">執筆</span>
-                            </button>
-                        </div>
-                        {genning && (
-                            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center z-[100] text-white">
-                                <RefreshCw className="animate-spin w-12 h-12 mb-4 text-white"/>
-                                <span className="font-bold">AIが執筆しています...</span>
-                            </div>
-                        )}
-                    </div>
-                );
-            };
-
-            const ReaderView = () => {
-                const [audioUrl, setAudioUrl] = useState(null);
-                const [isPlaying, setIsPlaying] = useState(false);
-                
-                const handleTTS = async () => {
-                    if (isPlaying) { setIsPlaying(false); return; }
-                    setLoading(true);
-                    try {
-                        const pcm = await generateSpeech(activeBook.content.slice(0, 1200));
-                        setAudioUrl(pcmToWav(pcm));
-                        setIsPlaying(true);
-                    } catch (e) { setError(e.message); } finally { setLoading(false); }
-                };
-
-                return (
-                    <div className="h-screen flex flex-col bg-[#fdfbf7] animate-in overflow-hidden">
-                        <div className="flex-1 overflow-x-auto no-scrollbar">
-                            <VerticalTextDisplay title={activeBook.title} content={activeBook.content} />
-                        </div>
-                        <div className="h-16 border-t bg-white/90 backdrop-blur-md flex items-center justify-around shrink-0 safe-area-pb z-40">
-                            <button onClick={() => setView('library')} className="text-gray-500 flex flex-col items-center gap-1 flex-1">
-                                <Library className="w-5 h-5"/><span className="text-[10px] font-bold">書庫</span>
-                            </button>
-                            <button onClick={handleTTS} className={`flex flex-col items-center gap-1 flex-1 ${isPlaying ? 'text-indigo-600' : 'text-gray-500'}`}>
-                                <Volume2 className="w-5 h-5"/><span className="text-[10px] font-bold">朗読</span>
-                            </button>
-                            <button onClick={() => setView('write')} className="text-gray-500 flex flex-col items-center gap-1 flex-1">
-                                <Edit3 className="w-5 h-5"/><span className="text-[10px] font-bold">編集</span>
-                            </button>
-                        </div>
-                        {isPlaying && audioUrl && <audio src={audioUrl} autoPlay onEnded={() => setIsPlaying(false)} hidden />}
-                    </div>
-                );
-            };
-
-            return (
-                <div className="min-h-screen text-gray-900 selection:bg-indigo-100">
-                    {view === 'library' && <LibraryView />}
-                    {view === 'write' && <WritingDesk />}
-                    {view === 'read' && <ReaderView />}
-                    
-                    {showSettings && (
-                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6" onClick={() => setShowSettings(false)}>
-                            <div className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl animate-in" onClick={e => e.stopPropagation()}>
-                                <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><Settings className="text-indigo-600 w-5 h-5"/>設定</h3>
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center bg-gray-50 p-4 rounded-xl">
-                                        <span className="text-sm font-bold text-gray-700">作品の削除モード</span>
-                                        <button onClick={() => setIsDeleteMode(!isDeleteMode)} className={`w-14 h-7 rounded-full relative transition-colors duration-300 ${isDeleteMode ? 'bg-red-500' : 'bg-gray-300'}`}>
-                                            <div className={`w-5 h-5 bg-white rounded-full absolute top-1 shadow-md transition-all duration-300 ${isDeleteMode ? 'left-8' : 'left-1'}`} />
-                                        </button>
-                                    </div>
-                                    <button 
-                                        onClick={() => { if(confirm("APIキーを消去しますか？")) { setApiKey(""); localStorage.removeItem('gemini_api_key'); setShowSettings(false); } }} 
-                                        className="w-full py-3 text-red-600 text-xs font-bold border border-red-100 rounded-xl active:bg-red-50"
-                                    >
-                                        APIキーをリセット
-                                    </button>
-                                </div>
-                                <button onClick={() => setShowSettings(false)} className="w-full mt-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all">設定を閉じる</button>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {error && (
-                        <div className="fixed bottom-24 left-4 right-4 bg-red-600 text-white p-4 rounded-2xl shadow-2xl z-[300] flex justify-between items-center animate-in">
-                            <span className="text-xs font-bold leading-tight">{error}</span>
-                            <button onClick={() => setError(null)} className="p-1"><X className="w-5 h-5"/></button>
-                        </div>
-                    )}
-                    
-                    {loading && (
-                        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-[500] flex items-center justify-center">
-                            <RefreshCw className="animate-spin w-10 h-10 text-indigo-600"/>
-                        </div>
-                    )}
-                </div>
-            );
         }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
     </script>
 </body>
 </html>
