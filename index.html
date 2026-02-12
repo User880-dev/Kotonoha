@@ -270,24 +270,84 @@ body {
                         <button id="tool-subtab-settings" class="flex-1 py-1 text-xs rounded-md transition-all">設定・出力</button>
                     </div>
 
-                    <div id="tool-panel-ai" class="space-y-6">
+                                        <div id="tool-panel-ai" class="space-y-6">
                         <section class="bg-white p-4 rounded-xl shadow-sm">
                             <h3 class="text-sm font-bold mb-2 flex items-center gap-2"><i data-lucide="feather" class="w-4 h-4"></i> AIと一緒に書く</h3>
+                            
                             <div class="flex gap-2 mb-2">
                                 <select id="select-genre-main" class="flex-1 p-2 border rounded text-xs bg-white"></select>
                                 <select id="select-genre-sub" class="flex-1 p-2 border rounded text-xs bg-white">
                                     <option value="">（詳細なし）</option>
                                 </select>
                             </div>
+
                             <div class="mb-2">
-    <label class="text-[10px] text-gray-500 mb-1 block">執筆量の目安</label>
-    <select id="select-pages" class="w-full p-2 border rounded text-xs bg-white">
-        <option value="400">約1ページ (400文字程度)</option>
-        <option value="800" selected>約2ページ (800文字程度)</option>
-        <option value="1600">約4ページ (1600文字程度)</option>
-        <option value="4000">約10ページ (4000文字程度)</option>
-    </select>
-</div>
+                                <label class="text-[10px] text-gray-500 mb-1 block">物語の規模（スケール）</label>
+                                <select id="select-scale" class="w-full p-2 border rounded text-xs bg-white">
+                                    <option value="short">中編小説（15〜25話程度）</option>
+                                    <option value="standard" selected>長編小説（30〜60話程度）</option>
+                                    <option value="epic">超大作シリーズ（80〜120話程度）</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="text-[10px] text-gray-500 mb-1 block">1回あたりの執筆量</label>
+                                <select id="select-pages" class="w-full p-2 border rounded text-xs bg-white">
+                                    <option value="400">サクサク（約400文字）</option>
+                                    <option value="800" selected>標準（約800文字）</option>
+                                    <option value="1600">じっくり（約1600文字）</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4 bg-gray-100 p-3 rounded-lg border border-gray-200">
+                                <label class="text-[10px] font-bold text-gray-600 mb-2 block flex items-center gap-1">
+                                    <i data-lucide="map" class="w-3 h-3"></i> 運命の設計図（構成案）
+                                </label>
+                                <textarea id="input-roadmap" class="w-full p-2 border rounded text-[10px] h-32 font-mono leading-relaxed bg-white" 
+                                    placeholder="物語を開始すると、ここに全話の構成が自動生成されます。"></textarea>
+                            </div>
+
+                            <textarea id="input-ai-prompt" class="w-full p-2 border rounded text-sm h-20 mb-2" placeholder="次の展開やアイデア..."></textarea>
+                            
+                            <div class="flex gap-2 mb-2">
+                                <button id="btn-ai-write-new" class="flex-1 bg-green-600 text-white py-2 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-green-700">
+                                    <i data-lucide="pen-tool" class="w-3 h-3"></i> 物語を開始する
+                                </button>
+                                <button id="btn-ai-write-continue" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-xs flex items-center justify-center gap-1 hover:bg-indigo-700 disabled:bg-gray-300">
+                                    <i data-lucide="more-horizontal" class="w-3 h-3"></i> 続きを書く
+                                </button>
+                            </div>
+                            
+                            <button id="btn-ai-review" class="w-full bg-orange-100 text-orange-800 py-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                                <i data-lucide="user" class="w-3 h-3"></i> AI編集者のレビュー
+                            </button>
+                        </section>
+
+                        <section class="bg-white p-4 rounded-xl shadow-sm">
+                            <h3 class="text-sm font-bold mb-2 flex items-center gap-2"><i data-lucide="image" class="w-4 h-4"></i> ビジュアル</h3>
+                            <div class="flex gap-2 mb-2">
+                                <button id="btn-gen-cover" class="flex-1 border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50">表紙を生成</button>
+                                <label class="flex-1 border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50 flex justify-center items-center cursor-pointer">
+                                    UP
+                                    <input type="file" id="file-upload-cover" class="hidden" accept="image/*">
+                                </label>
+                            </div>
+
+                            <div id="illustration-control-area" class="mb-4">
+                                <button id="btn-show-illus-input" class="w-full border border-gray-300 py-2 rounded-lg text-xs hover:bg-gray-50">挿絵を追加</button>
+                                <div id="illus-input-container" class="hidden flex flex-col gap-2">
+                                    <textarea id="input-illus-prompt" placeholder="例: 桜の木の下で本を読む少女" class="w-full p-2 border rounded text-xs h-16"></textarea>
+                                    <div class="flex gap-2">
+                                        <button id="btn-gen-illus" class="flex-1 bg-indigo-600 text-white py-1 rounded text-xs">描く</button>
+                                        <button id="btn-close-illus" class="px-3 bg-gray-200 rounded text-xs">閉じる</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="visual-gallery-grid" class="grid grid-cols-4 gap-2">
+                                </div>
+                        </section>
+                    </div>
 
                             <textarea id="input-ai-prompt" class="w-full p-2 border rounded text-sm h-20 mb-2" placeholder="次の展開やアイデア..."></textarea>
                             <div class="flex gap-2 mb-2">
