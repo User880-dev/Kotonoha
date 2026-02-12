@@ -14,42 +14,157 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
-        body {
-            font-family: 'Shippori Mincho', serif;
-            touch-action: manipulation; /* Double-tap zoom prevention */
-        }
-        /* 縦書き用ユーティリティ */
-        .writing-vertical-rl {
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-        }
-        /* スクロールバー非表示（Appライクな見た目） */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        /* Safe Area対応 */
-        .safe-area-pb {
-            padding-bottom: env(safe-area-inset-bottom);
-        }
-        /* アニメーション */
-        @keyframes slideIn {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-        .animate-slide-in {
-            animation: slideIn 0.3s ease-out;
-        }
-        .animate-spin {
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
+        /* --- Base Reset & Typography --- */
+body {
+    font-family: 'Shippori Mincho', 'Times New Roman', serif;
+    touch-action: manipulation; /* ダブルタップズーム防止 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior-y: none; /* バウンススクロール防止 */
+}
+
+/* --- Scrollbar Customization --- */
+/* アプリらしい見た目のためにスクロールバーを隠すが機能は維持 */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* --- Vertical Writing Mode Utilities --- */
+.writing-vertical-rl {
+    writing-mode: vertical-rl;
+    -webkit-writing-mode: vertical-rl;
+    text-orientation: upright;
+    -webkit-text-orientation: upright;
+}
+
+/* 縦書き時の行間・文字間調整 */
+.vertical-text-content {
+    line-height: 2.5; /* 行間を広めに */
+    letter-spacing: 0.1em; /* 文字間を少し空ける */
+    font-feature-settings: "palt"; /* プロポーショナルメトリクス */
+}
+
+/* 縦書き内の英数字を縦向きにするクラス（必要に応じてJSで付与） */
+.tate-chu-yoko {
+    text-combine-upright: all;
+    -webkit-text-combine: horizontal;
+}
+
+/* --- Safe Area Insets (iPhone X以降対応) --- */
+.safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+.safe-area-pt {
+    padding-top: env(safe-area-inset-top, 20px);
+}
+
+/* --- Animations --- */
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Utility Classes for Animations */
+.animate-slide-in {
+    animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-out {
+    animation: slideOutRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out forwards;
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* --- Component Specific Styles --- */
+
+/* View Transitions */
+.view-section {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Glassmorphism Effect for Headers/Modals */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Book Cover Hover Effect */
+.book-cover-hover {
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.book-cover-hover:active {
+    transform: scale(0.95);
+}
+
+/* Custom Checkbox Toggle Switch */
+.toggle-checkbox:checked {
+    right: 0;
+    border-color: #4f46e5;
+}
+.toggle-checkbox:checked + .toggle-label {
+    background-color: #4f46e5;
+}
+
+/* Loader Overlay */
+#loading-overlay {
+    backdrop-filter: blur(4px);
+    z-index: 9999; /* 最前面 */
+}
+
+/* Tooltip Customization (Simple) */
+[title]:hover::after {
+    /* ブラウザ標準ツールチップに任せるが、必要ならここにカスタムCSSを追加可能 */
+}
+
+/* 縦書きモード時の画像の扱い */
+.vertical-image-container {
+    writing-mode: horizontal-tb; /* 画像エリアだけ横書きに戻す */
+    margin: 1rem 0.5rem;
+    display: inline-block;
+    vertical-align: middle;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    background: white;
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.vertical-image-container img {
+    max-width: 60vw;
+    max-height: 50vh;
+    object-fit: contain;
+}
     </style>
     
     <script>
