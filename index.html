@@ -1023,64 +1023,91 @@ function renderVisualGallery() {
 async function handleAIWrite(type) {
     saveCurrentBook();
     const promptInput = document.getElementById('input-ai-prompt').value.trim();
+    const targetLength = parseInt(document.getElementById('select-pages').value);
     const roadmapInput = document.getElementById('input-roadmap').value.trim();
     const scale = document.getElementById('select-scale').value;
     
-    // 現在の状態（何話目か）を管理
-    if (!activeBook.currentChapter) activeBook.currentChapter = 0;
+    // 進行状況の管理
+    if (activeBook.currentChapter === undefined) activeBook.currentChapter = 0;
     
     showLoading(true);
     try {
-        let systemPrompt = "あなたは天才小説家です。";
+        // ★修正点1: 「余計なことは喋るな」と厳しく指示
+        let systemPrompt = `あなたはプロの小説家です。
+【重要】出力には「はい、分かりました」などの返答や挨拶は一切含めないでください。
+Markdown形式（**太字**など）は使わず、小説の本文のみをプレーンテキストで出力してください。`;
+        
         let userPrompt = "";
 
-        // --- A. 新しく物語を始める（設計図作成） ---
+        // --- A. 物語を新しく開始する場合 ---
         if (type === 'new' && !roadmapInput) {
-            // スケールに合わせてランダムに話数を決定（例: 30〜60話）
+            // スケール決定
             let min = 30, max = 60;
             if (scale === 'short') { min = 15; max = 25; }
             if (scale === 'epic') { min = 80; max = 120; }
-            
             const total = Math.floor(Math.random() * (max - min + 1)) + min;
-            activeBook.totalChapters = total; // 全話数を保存
-            activeBook.currentChapter = 1;    // 1話目から開始
-
-            systemPrompt += `\n全${total}話の重厚な長編を構想しました。まず全話のタイトルと要約（設計図）を書いてください。`;
-            userPrompt = `テーマ: ${promptInput || "最高の物語"}\n形式: 1話: [要約]... で${total}話分。`;
             
+            activeBook.totalChapters = total; 
+            activeBook.currentChapter = 1;
+
+            // ★修正点2: 設計図だけを出力させる
+            systemPrompt += `\n全${total}話の構成案（プロット）を作成してください。
+形式は「第1話: [タイトル] - [あらすじ]」というリスト形式のみを出力してください。`;
+            
+            userPrompt = `テーマ: ${promptInput || "王道の物語"}\nジャンル: ${activeBook.genre}\n
+余計な前置きは不要です。全${total}話分のリストを作成してください。`;
+            
+            // 1回目：設計図を作る
             const roadmap = await generateText(userPrompt, systemPrompt);
             document.getElementById('input-roadmap').value = roadmap;
             activeBook.worldSettings = roadmap;
 
-            userPrompt = `設計図の「第1話」を執筆してください。タイトルも提案してください。`;
+            // ★修正点3: 本文を書くための再指示
+            // システムプロンプトを「執筆モード」に切り替え
+            systemPrompt = `あなたは小説家です。先ほど作成した設計図の「第1話」を小説の本文として執筆してください。
+あらすじや説明ではなく、情景描写や会話を含む「物語の本文」を書いてください。
+冒頭に「タイトル: [作品名]」を一行だけ書き、改行してから本文を始めてください。`;
+
+            userPrompt = `設計図の第1話を約${targetLength}文字で執筆してください。`;
         } 
-        // --- B. 続きを書く（カウントダウン） ---
+        // --- B. 続きを書く場合 ---
         else {
             activeBook.currentChapter++;
             const remaining = activeBook.totalChapters - activeBook.currentChapter;
             
-            systemPrompt += `\n全${activeBook.totalChapters}話のうち、現在は第${activeBook.currentChapter}話を執筆中です。`;
-            if (remaining === 0) systemPrompt += "【重要】これが最終回です。物語を完璧に完結させてください。";
+            systemPrompt += `\n全${activeBook.totalChapters}話中の第${activeBook.currentChapter}話を執筆します。
+以下の設計図に従い、あらすじではなく「小説の本文」を書いてください。\n【設計図】\n${roadmapInput}`;
+            
+            if (remaining <= 0) {
+                systemPrompt += "\n【重要】これが最終回です。物語を完結させてください。";
+            }
 
-            userPrompt = `これまでの内容を汲み取り、設計図の第${activeBook.currentChapter}話を執筆してください。`;
+            userPrompt = `直近の続きから、設計図の第${activeBook.currentChapter}話を約${targetLength}文字で描写してください。`;
         }
 
         const text = await generateText(userPrompt, systemPrompt);
         
-        // テキスト反映処理（中略）
+        // テキスト反映
         if (type === 'new') {
             const titleMatch = text.match(/タイトル[:：]\s*(.+)/);
-            if (titleMatch) { activeBook.title = titleMatch[1].trim(); activeBook.content = text.replace(titleMatch[0], '').trim(); }
-            else { activeBook.content = text; }
-        } else { activeBook.content += "\n\n" + text; }
-
-        // ★ボタンのテキストを「あと◯◯回」に書き換える
-        updateContinueButton();
+            if (titleMatch) {
+                activeBook.title = titleMatch[1].trim();
+                activeBook.content = text.replace(titleMatch[0], '').trim();
+                document.getElementById('input-book-title').value = activeBook.title;
+            } else { activeBook.content = text; }
+        } else {
+            activeBook.content += "\n\n" + text;
+        }
         
+        updateContinueButton();
         document.getElementById('textarea-content').value = activeBook.content;
         saveData();
         switchWriterTab('write'); 
-    } catch (e) { showError(e.message); } finally { showLoading(false); }
+    } catch (e) {
+        showError("執筆エラー: " + e.message);
+    } finally {
+        showLoading(false);
+    }
 }
 
 // ボタンの文字を更新する関数
