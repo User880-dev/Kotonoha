@@ -444,9 +444,61 @@ body {
 // APIキーはローカルストレージから取得、なければ空文字
 let apiKey = localStorage.getItem('kotonoha_api_key') || "";
 
-const GEMINI_MODEL = "gemini-2.0-flash"; // 安定版に変更推奨 (または flash-preview)
-const IMAGEN_MODEL = "imagen-3.0-generate-001"; // 最新モデルに適宜変更
-const TTS_MODEL = "gemini-2.0-flash-exp"; // 音声生成用モデル
+/**
+ * 言の葉書庫 - APIモデル定義
+ * 提供された診断結果に基づき、安定版を優先的に配置しています。
+ */
+
+// --- メインで使用するモデル (エラー時はここを書き換えてください) ---
+// 2.5 Flashは2025年6月リリースの安定版で、無料枠でも動作しやすいため第一候補にします。
+const GEMINI_MODEL = "gemini-2.5-flash"; 
+const IMAGEN_MODEL = "gemini-2.5-flash-image"; // 画像生成用
+const TTS_MODEL    = "gemini-2.5-flash-preview-tts"; // 音声合成用
+
+// --- 利用可能な全モデルリスト (内部管理・将来の拡張用) ---
+const MODEL_REGISTRY = {
+    // 安定版・推奨モデル (Stable)
+    stable: [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-flash-001",
+        "gemini-2.0-flash-lite-001",
+        "gemini-2.5-flash-lite",
+        "gemini-flash-latest",
+        "gemini-pro-latest"
+    ],
+    // 特殊機能モデル (Image / TTS)
+    specialized: [
+        "gemini-2.5-flash-image",
+        "gemini-2.5-flash-preview-tts",
+        "gemini-2.5-pro-preview-tts",
+        "gemini-2.0-flash-exp-image-generation",
+        "gemini-3-pro-image-preview",
+        "nano-banana-pro-preview"
+    ],
+    // プレビュー・実験版 (Preview / Exp)
+    preview: [
+        "gemini-3-flash-preview",
+        "gemini-3-pro-preview",
+        "gemini-2.5-flash-preview-09-2025",
+        "gemini-2.5-flash-lite-preview-09-2025",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-exp-1206",
+        "gemini-2.5-computer-use-preview-10-2025",
+        "deep-research-pro-preview-12-2025",
+        "gemini-robotics-er-1.5-preview"
+    ],
+    // 軽量モデル (Gemma系)
+    gemma: [
+        "gemma-3-1b-it",
+        "gemma-3-4b-it",
+        "gemma-3-12b-it",
+        "gemma-3-27b-it",
+        "gemma-3n-e4b-it",
+        "gemma-3n-e2b-it"
+    ]
+};
 
 const GENRE_DEFINITIONS = {
     "ファンタジー": ["王道・ハイファンタジー", "異世界転生・転移", "ダークファンタジー", "ローファンタジー（現代異能）", "魔法少女・魔女", "ダンジョン・冒険", "和風ファンタジー", "スチームパンク"],
