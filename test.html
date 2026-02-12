@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Gemini API 診断ツール</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 8px; shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input { width: 300px; padding: 8px; margin-bottom: 10px; }
+        button { padding: 8px 16px; cursor: pointer; background: #4f46e5; color: white; border: none; border-radius: 4px; }
+        pre { background: #eee; padding: 10px; overflow-x: auto; font-size: 12px; }
+        .ok { color: green; font-weight: bold; }
+        .ng { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Gemini API 診断</h1>
+        <p>APIキーを入力して「診断開始」を押してください。</p>
+        <input type="text" id="keyInput" placeholder="AIza..." />
+        <button onclick="diagnose()">診断開始</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function diagnose() {
+            const key = document.getElementById('keyInput').value;
+            const resDiv = document.getElementById('result');
+            if (!key) return alert("キーを入力してください");
+
+            resDiv.innerHTML = "診断中...";
+
+            try {
+                // 利用可能なモデル一覧を取得するAPI
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    resDiv.innerHTML = `<p class="ng">エラー発生: ${data.error.message}</p>`;
+                    return;
+                }
+
+                const models = data.models || [];
+                let html = `<h3>✅ 接続成功！利用可能なモデル一覧:</h3><ul>`;
+                
+                // テキスト生成ができるモデルを抽出
+                const canGenerate = models.filter(m => m.supportedGenerationMethods.includes('generateContent'));
+                
+                canGenerate.forEach(m => {
+                    const shortName = m.name.replace('models/', '');
+                    html += `<li><strong>${shortName}</strong><br><small>${m.description}</small></li>`;
+                });
+                
+                html += `</ul><p>このリストにある名前を <code>GEMINI_MODEL</code> に設定すれば動くはずです。</p>`;
+                resDiv.innerHTML = html;
+
+            } catch (e) {
+                resDiv.innerHTML = `<p class="ng">通信エラー: ${e.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
