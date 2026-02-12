@@ -679,5 +679,641 @@ const generateSpeech = async (text, voiceName = "Kore") => {
 };
 
 </script>
+    <script>
+/**
+ * ==============================================================================
+ * PART 4: UI LOGIC & STATE MANAGEMENT
+ * ==============================================================================
+ */
+
+// --- State Management ---
+let books = [];
+let activeBookId = null;
+let currentView = 'library'; // library, writing, reader
+let isDeleteMode = false;
+let backgroundImage = localStorage.getItem('kotonoha_bg') || null;
+let audioPlayer = document.getElementById('audio-player');
+let isPlayingTTS = false;
+
+// DOM Elements Cache
+const views = {
+    library: document.getElementById('view-library'),
+    writing: document.getElementById('view-writing'),
+    reader: document.getElementById('view-reader')
+};
+
+// --- Initialization ---
+
+function init() {
+    loadData();
+    applyBackground();
+    renderLibrary();
+    setupEventListeners();
+    lucide.createIcons();
+    
+    // APIキー入力欄の初期値
+    document.getElementById('input-api-key').value = apiKey;
+}
+
+function loadData() {
+    const savedBooks = localStorage.getItem('kotonoha_books');
+    if (savedBooks) {
+        try {
+            books = JSON.parse(savedBooks).map(b => ({
+                ...b,
+                characters: b.characters || [],
+                worldSettings: b.worldSettings || "",
+                illustrations: b.illustrations || [],
+                genre: b.genre || "未設定",
+                chatHistory: b.chatHistory || []
+            }));
+        } catch (e) {
+            console.error("Data load error", e);
+            books = [];
+        }
+    }
+}
+
+function saveData() {
+    localStorage.setItem('kotonoha_books', JSON.stringify(books));
+}
+
+function applyBackground() {
+    const bgLayer = document.getElementById('bg-layer');
+    if (backgroundImage) {
+        bgLayer.style.backgroundImage = `url(${backgroundImage})`;
+        bgLayer.style.opacity = '1';
+    } else {
+        bgLayer.style.backgroundImage = 'none';
+    }
+}
+
+// --- View Controller ---
+
+function switchView(viewName) {
+    // Hide all
+    Object.values(views).forEach(el => {
+        el.classList.add('hidden');
+        el.classList.remove('flex'); // For flex containers
+    });
+    
+    // Show target
+    const target = views[viewName];
+    target.classList.remove('hidden');
+    if (viewName !== 'library') {
+        target.classList.add('flex');
+    }
+
+    currentView = viewName;
+    window.scrollTo(0, 0);
+}
+
+// --- Library Logic ---
+
+function renderLibrary() {
+    const grid = document.getElementById('book-grid');
+    // Keep the "New Book" button (first child)
+    const newBookBtn = document.getElementById('btn-new-book');
+    grid.innerHTML = '';
+    grid.appendChild(newBookBtn);
+
+    books.forEach(book => {
+        const div = document.createElement('div');
+        div.className = "relative group animate-fade-in";
+        div.onclick = () => openReader(book.id);
+
+        let coverHtml;
+        if (book.cover) {
+            coverHtml = `<img src="${book.cover}" alt="${book.title}" class="w-full h-full object-cover book-cover-hover">`;
+        } else {
+            coverHtml = `
+                <div class="w-full h-full bg-gradient-to-br from-indigo-50 to-slate-100 flex items-center justify-center p-4 text-center book-cover-hover">
+                  <span class="font-serif text-xl text-gray-700 writing-vertical-rl">${book.title}</span>
+                </div>`;
+        }
+
+        div.innerHTML = `
+            <div class="aspect-[2/3] bg-white rounded-r-lg rounded-l-sm shadow-md transition-all cursor-pointer overflow-hidden border-l-4 border-l-gray-800 relative active:scale-95">
+                ${coverHtml}
+                <div class="absolute bottom-0 left-0 right-0 bg-black/60 p-2 text-white">
+                    <h3 class="font-bold text-xs truncate">${book.title}</h3>
+                    <div class="text-[10px] opacity-80">${book.genre?.split('（')[0]}</div>
+                </div>
+            </div>
+        `;
+        grid.appendChild(div);
+    });
+    lucide.createIcons();
+}
+
+function createNewBook(title = "無題の物語", initialContent = "", genre = "未設定") {
+    const newBook = {
+        id: generateId(),
+        title: title,
+        content: initialContent,
+        genre: genre,
+        cover: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        chatHistory: [],
+        characters: [],
+        worldSettings: "",
+        illustrations: []
+    };
+    books.unshift(newBook);
+    saveData();
+    openWriter(newBook.id);
+}
+
+// --- Writer Logic ---
+
+let writerTab = 'write'; // write, preview, tools
+let activeBook = null;
+
+function openWriter(bookId) {
+    activeBookId = bookId;
+    activeBook = books.find(b => b.id === bookId);
+    if (!activeBook) return;
+
+    // UI Reset
+    document.getElementById('input-book-title').value = activeBook.title;
+    document.getElementById('textarea-content').value = activeBook.content || "";
+    document.getElementById('input-world-settings').value = activeBook.worldSettings || "";
+    
+    // Genre Select
+    const genreSelect = document.getElementById('select-genre-main');
+    genreSelect.innerHTML = Object.keys(GENRE_DEFINITIONS).map(g => `<option value="${g}">${g}</option>`).join('');
+    // Attempt to select current genre
+    const currentGenreKey = Object.keys(GENRE_DEFINITIONS).find(k => activeBook.genre.includes(k)) || "ファンタジー";
+    genreSelect.value = currentGenreKey;
+    updateSubGenre(currentGenreKey);
+
+    renderCharactersList();
+    renderVisualGallery();
+    switchWriterTab('write');
+    switchView('writing');
+}
+
+function saveCurrentBook() {
+    if (!activeBook) return;
+    activeBook.title = document.getElementById('input-book-title').value;
+    activeBook.content = document.getElementById('textarea-content').value;
+    activeBook.worldSettings = document.getElementById('input-world-settings').value;
+    activeBook.updatedAt = Date.now();
+    saveData();
+}
+
+function switchWriterTab(tab) {
+    writerTab = tab;
+    // Hide all contents
+    ['write', 'preview', 'tools'].forEach(t => {
+        document.getElementById(`tab-content-${t}`).classList.add('hidden');
+        document.getElementById(`tab-btn-${t}`).classList.remove('text-indigo-600');
+        document.getElementById(`tab-btn-${t}`).classList.add('text-gray-400');
+    });
+
+    // Show active
+    document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+    document.getElementById(`tab-btn-${tab}`).classList.add('text-indigo-600');
+    document.getElementById(`tab-btn-${tab}`).classList.remove('text-gray-400');
+
+    if (tab === 'preview') {
+        saveCurrentBook();
+        renderVerticalText(document.getElementById('preview-vertical-text'), activeBook.content, activeBook.illustrations);
+    }
+}
+
+function updateSubGenre(mainGenre) {
+    const subSelect = document.getElementById('select-genre-sub');
+    const subs = GENRE_DEFINITIONS[mainGenre] || [];
+    subSelect.innerHTML = '<option value="">（詳細なし）</option>' + subs.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
+function renderCharactersList() {
+    const container = document.getElementById('characters-list');
+    container.innerHTML = '';
+    activeBook.characters.forEach((char, index) => {
+        const div = document.createElement('div');
+        div.className = "flex gap-2 mb-1";
+        div.innerHTML = `
+            <input type="text" class="w-1/3 p-1 border rounded text-xs" placeholder="名前" value="${char.name}" onchange="updateCharacter(${index}, 'name', this.value)">
+            <input type="text" class="flex-1 p-1 border rounded text-xs" placeholder="詳細" value="${char.desc}" onchange="updateCharacter(${index}, 'desc', this.value)">
+        `;
+        container.appendChild(div);
+    });
+}
+
+window.updateCharacter = (index, field, value) => {
+    activeBook.characters[index][field] = value;
+    saveData();
+};
+
+function renderVisualGallery() {
+    const grid = document.getElementById('visual-gallery-grid');
+    grid.innerHTML = '';
+    
+    // Cover
+    if (activeBook.cover) {
+        const div = document.createElement('div');
+        div.className = "aspect-[2/3] relative cursor-pointer group border rounded overflow-hidden";
+        div.onclick = () => showImagePreview(activeBook.cover);
+        div.innerHTML = `
+            <img src="${activeBook.cover}" class="w-full h-full object-cover">
+            <span class="absolute bottom-0 left-0 bg-black/50 text-white text-[8px] p-0.5 w-full text-center">表紙</span>
+        `;
+        grid.appendChild(div);
+    }
+
+    // Illustrations
+    activeBook.illustrations.forEach(img => {
+        const div = document.createElement('div');
+        div.className = "aspect-square relative cursor-pointer border rounded overflow-hidden";
+        div.onclick = () => showImagePreview(img.data);
+        div.innerHTML = `<img src="${img.data}" class="w-full h-full object-cover">`;
+        grid.appendChild(div);
+    });
+}
+
+// --- AI Logic (Writer) ---
+
+async function handleAIWrite(type) {
+    saveCurrentBook();
+    const prompt = document.getElementById('input-ai-prompt').value;
+    const mainG = document.getElementById('select-genre-main').value;
+    const subG = document.getElementById('select-genre-sub').value;
+    const genreText = subG ? `${mainG}（${subG}）` : mainG;
+    activeBook.genre = genreText;
+
+    showLoading(true);
+    try {
+        let systemPrompt = "あなたはプロの小説家です。美しい日本語で、感情豊かに物語を書いてください。出力はMarkdownではなくプレーンテキストで。";
+        if (activeBook.characters.length > 0) systemPrompt += `\n\n【登場人物設定】\n${JSON.stringify(activeBook.characters)}`;
+        if (activeBook.worldSettings) systemPrompt += `\n\n【世界観】\n${activeBook.worldSettings}`;
+
+        let userPrompt = "";
+        if (type === 'new') {
+            userPrompt = `ジャンル「${genreText}」で、次の要素を含む物語の冒頭を書いてください: ${prompt}。タイトルも提案してください（形式: タイトル: [タイトル]）。`;
+        } else {
+            systemPrompt += " 既存の物語の続きを書いてください。";
+            userPrompt = `これまでのあらすじ（直近）:\n${activeBook.content.slice(-1500)}\n\n指示: 続きを書いてください。展開案: ${prompt}`;
+        }
+
+        const text = await generateText(userPrompt, systemPrompt);
+        
+        if (type === 'new') {
+            const titleMatch = text.match(/タイトル[:：]\s*(.+)/);
+            if (titleMatch) {
+                activeBook.title = titleMatch[1].trim();
+                activeBook.content = text.replace(titleMatch[0], '').trim();
+                document.getElementById('input-book-title').value = activeBook.title;
+            } else {
+                activeBook.content = text;
+            }
+        } else {
+            activeBook.content += "\n\n" + text;
+        }
+        
+        document.getElementById('textarea-content').value = activeBook.content;
+        saveData();
+        switchWriterTab('write'); // Editorへ戻る
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function handleGenerateIllustration() {
+    const prompt = document.getElementById('input-illus-prompt').value;
+    if (!prompt) return alert("プロンプトを入力してください");
+    
+    showLoading(true);
+    try {
+        const fullPrompt = `Anime style illustration, ${prompt}, ${activeBook.genre || 'fantasy'}`;
+        const b64 = await generateImage(fullPrompt);
+        if (b64) {
+            const compressed = await compressImage(b64, 400, 0.7);
+            const imgId = generateId();
+            activeBook.illustrations.push({ id: imgId, data: compressed });
+            
+            // Insert tag into content
+            activeBook.content += `\n\n[挿絵:${imgId}]\n\n`;
+            document.getElementById('textarea-content').value = activeBook.content;
+            
+            document.getElementById('input-illus-prompt').value = "";
+            document.getElementById('illus-input-container').classList.add('hidden');
+            
+            saveData();
+            renderVisualGallery();
+            alert("挿絵を追加しました");
+        }
+    } catch (e) {
+        showError("画像生成エラー: " + e.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function handleGenerateCover() {
+    showLoading(true);
+    try {
+        const prompt = `Book cover art, ${activeBook.title}, ${activeBook.genre}, elegant, no text, high quality`;
+        const b64 = await generateImage(prompt);
+        if (b64) {
+            const compressed = await compressImage(b64, 400, 0.7);
+            activeBook.cover = compressed;
+            saveData();
+            renderVisualGallery();
+        }
+    } catch (e) {
+        showError("表紙生成エラー: " + e.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// --- Reader Logic ---
+
+function openReader(bookId) {
+    activeBookId = bookId;
+    activeBook = books.find(b => b.id === bookId);
+    if (!activeBook) return;
+
+    renderVerticalText(document.getElementById('reader-content-area'), activeBook.content, activeBook.illustrations);
+    
+    // Reset Chat
+    const chatContainer = document.getElementById('chat-messages');
+    chatContainer.innerHTML = '';
+    (activeBook.chatHistory || []).forEach(msg => appendChatMessage(msg.role, msg.text));
+    
+    switchView('reader');
+}
+
+function renderVerticalText(container, content, illustrations) {
+    if (!content) {
+        container.innerHTML = '<div class="text-gray-400 p-4">まだ白紙のようです...</div>';
+        return;
+    }
+
+    const parts = content.split(/\[挿絵:(.+?)\]/g);
+    container.innerHTML = '';
+    
+    parts.forEach((part, i) => {
+        if (i % 2 === 0) {
+            // Text part
+            const span = document.createElement('span');
+            span.textContent = part;
+            container.appendChild(span);
+        } else {
+            // Illustration ID part
+            const imgData = illustrations?.find(img => img.id === part);
+            if (imgData) {
+                const div = document.createElement('div');
+                div.className = "vertical-image-container";
+                div.onclick = () => showImagePreview(imgData.data);
+                div.innerHTML = `<img src="${imgData.data}" alt="挿絵">`;
+                container.appendChild(div);
+            }
+        }
+    });
+}
+
+async function handleTTS() {
+    if (isPlayingTTS) {
+        audioPlayer.pause();
+        isPlayingTTS = false;
+        document.getElementById('btn-reader-tts').classList.remove('text-indigo-600');
+        return;
+    }
+
+    showLoading(true);
+    try {
+        // Remove illustration tags for reading
+        const cleanText = activeBook.content.replace(/\[挿絵:.+?\]/g, "");
+        const wavUrl = pcmToWav(await generateSpeech(cleanText.slice(0, 3000))); // Limit length
+        
+        audioPlayer.src = wavUrl;
+        audioPlayer.play();
+        isPlayingTTS = true;
+        document.getElementById('btn-reader-tts').classList.add('text-indigo-600');
+        
+        audioPlayer.onended = () => {
+            isPlayingTTS = false;
+            document.getElementById('btn-reader-tts').classList.remove('text-indigo-600');
+        };
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// --- Chat Logic ---
+
+async function handleChatSend() {
+    const input = document.getElementById('input-chat-message');
+    const text = input.value;
+    if (!text) return;
+
+    appendChatMessage('user', text);
+    input.value = '';
+    
+    // Update history
+    if (!activeBook.chatHistory) activeBook.chatHistory = [];
+    activeBook.chatHistory.push({ role: 'user', text });
+
+    try {
+        const context = `あなたは作品「${activeBook.title}」の作者、または登場人物です。読者の感想や質問に答えてください。`;
+        const response = await generateText(text, context);
+        
+        appendChatMessage('model', response);
+        activeBook.chatHistory.push({ role: 'model', text: response });
+        saveData();
+    } catch (e) {
+        showError("チャットエラー: " + e.message);
+    }
+}
+
+function appendChatMessage(role, text) {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = `p-2 rounded max-w-[80%] ${role === 'user' ? 'bg-indigo-100 ml-auto' : 'bg-gray-100'}`;
+    div.textContent = text;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
+// --- UI Helpers ---
+
+function showLoading(show) {
+    const el = document.getElementById('loading-overlay');
+    if (show) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+}
+
+function showError(msg) {
+    const el = document.getElementById('error-toast');
+    document.getElementById('error-message').textContent = msg;
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 5000);
+}
+
+function showImagePreview(src) {
+    document.getElementById('preview-modal-img').src = src;
+    document.getElementById('image-preview-modal').classList.remove('hidden');
+}
+
+// --- Event Listeners Setup ---
+
+function setupEventListeners() {
+    // Global
+    document.getElementById('btn-global-bg').onclick = async () => {
+        showLoading(true);
+        try {
+            const b64 = await generateImage("A cozy, warm, magical library with wooden shelves, soft lighting, detailed, fantasy art style, 4k");
+            if (b64) {
+                const compressed = await compressImage(b64, 800, 0.6);
+                backgroundImage = compressed;
+                localStorage.setItem('kotonoha_bg', compressed);
+                applyBackground();
+            }
+        } catch(e) { showError(e.message); }
+        finally { showLoading(false); }
+    };
+
+    document.getElementById('btn-close-error').onclick = () => document.getElementById('error-toast').classList.add('hidden');
+    document.getElementById('btn-close-preview').onclick = () => document.getElementById('image-preview-modal').classList.add('hidden');
+
+    // Library
+    document.getElementById('btn-new-book').onclick = () => createNewBook();
+    document.getElementById('btn-three-words').onclick = () => {
+        const shuffled = [...RANDOM_WORDS].sort(() => 0.5 - Math.random()).slice(0, 3);
+        if (confirm(`お題: 「${shuffled.join('」「')}」\nこのお題で物語を書きますか？`)) {
+            createNewBook("三題噺の物語", `お題: ${shuffled.join('、')}\n\n`, "三題噺");
+        }
+    };
+    
+    // Settings Modal
+    document.getElementById('btn-settings').onclick = () => document.getElementById('settings-modal').classList.remove('hidden');
+    document.getElementById('btn-close-settings').onclick = () => document.getElementById('settings-modal').classList.add('hidden');
+    document.getElementById('input-api-key').onchange = (e) => {
+        apiKey = e.target.value;
+        localStorage.setItem('kotonoha_api_key', apiKey);
+    };
+    document.getElementById('btn-reset-app').onclick = () => {
+        if(confirm("全データを削除して初期化しますか？")) { localStorage.clear(); location.reload(); }
+    };
+
+    // Writer: Header
+    document.getElementById('btn-writer-back').onclick = () => {
+        saveCurrentBook();
+        if(confirm("書庫に戻りますか？")) { switchView('library'); renderLibrary(); }
+    };
+    document.getElementById('btn-writer-finish').onclick = () => { saveCurrentBook(); switchView('library'); renderLibrary(); };
+
+    // Writer: Tabs
+    document.getElementById('tab-btn-write').onclick = () => switchWriterTab('write');
+    document.getElementById('tab-btn-preview').onclick = () => switchWriterTab('preview');
+    document.getElementById('tab-btn-tools').onclick = () => switchWriterTab('tools');
+
+    // Writer: Tool Subtabs
+    document.getElementById('tool-subtab-ai').onclick = () => {
+        document.getElementById('tool-panel-ai').classList.remove('hidden');
+        document.getElementById('tool-panel-settings').classList.add('hidden');
+        document.getElementById('tool-subtab-ai').classList.add('bg-white','shadow');
+        document.getElementById('tool-subtab-settings').classList.remove('bg-white','shadow');
+    };
+    document.getElementById('tool-subtab-settings').onclick = () => {
+        document.getElementById('tool-panel-ai').classList.add('hidden');
+        document.getElementById('tool-panel-settings').classList.remove('hidden');
+        document.getElementById('tool-subtab-ai').classList.remove('bg-white','shadow');
+        document.getElementById('tool-subtab-settings').classList.add('bg-white','shadow');
+    };
+
+    // Writer: AI Actions
+    document.getElementById('select-genre-main').onchange = (e) => updateSubGenre(e.target.value);
+    document.getElementById('btn-ai-write-new').onclick = () => handleAIWrite('new');
+    document.getElementById('btn-ai-write-continue').onclick = () => handleAIWrite('continue');
+    
+    // Writer: Illustration & Cover
+    document.getElementById('btn-show-illus-input').onclick = () => document.getElementById('illus-input-container').classList.remove('hidden');
+    document.getElementById('btn-close-illus').onclick = () => document.getElementById('illus-input-container').classList.add('hidden');
+    document.getElementById('btn-gen-illus').onclick = handleGenerateIllustration;
+    document.getElementById('btn-gen-cover').onclick = handleGenerateCover;
+    document.getElementById('file-upload-cover').onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                activeBook.cover = await compressImage(reader.result, 400, 0.7);
+                saveData();
+                renderVisualGallery();
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    // Writer: Settings
+    document.getElementById('btn-add-character').onclick = () => {
+        activeBook.characters.push({ name: "", desc: "" });
+        saveData();
+        renderCharactersList();
+    };
+    document.getElementById('btn-export-txt').onclick = () => {
+        const blob = new Blob([activeBook.content], { type: 'text/plain' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${activeBook.title}.txt`;
+        a.click();
+    };
+    document.getElementById('btn-delete-book').onclick = () => {
+        if (confirm("本当にこの物語を削除しますか？")) {
+            books = books.filter(b => b.id !== activeBook.id);
+            saveData();
+            switchView('library');
+            renderLibrary();
+        }
+    };
+    document.getElementById('btn-refine-text').onclick = async () => {
+        const textarea = document.getElementById('textarea-content');
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const selected = textarea.value.substring(start, end);
+        if(!selected) return alert("言葉を選択してください");
+        
+        showLoading(true);
+        try {
+            const res = await generateText(`言葉「${selected}」を、小説の中で使えるより情緒的、文学的、あるいはかっこいい表現に言い換えてください。5つほど箇条書きで提案してください。`);
+            alert(res);
+        } catch(e) { showError(e.message); }
+        finally { showLoading(false); }
+    };
+
+    // Reader Actions
+    document.getElementById('btn-reader-library').onclick = () => {
+        audioPlayer.pause();
+        switchView('library');
+        renderLibrary();
+    };
+    document.getElementById('btn-reader-tts').onclick = handleTTS;
+    document.getElementById('btn-reader-quote').onclick = async () => {
+        const sel = window.getSelection().toString();
+        if(!sel) return alert("文字を選択してください");
+        showLoading(true);
+        try {
+            const url = await createQuoteCard(sel, activeBook.title, "私", activeBook.cover);
+            const a = document.createElement('a'); a.href = url; a.download = 'quote.png'; a.click();
+        } catch(e) { showError(e.message); }
+        finally { showLoading(false); }
+    };
+    document.getElementById('btn-reader-chat').onclick = () => document.getElementById('reader-chat-overlay').classList.remove('hidden');
+    document.getElementById('btn-close-chat').onclick = () => document.getElementById('reader-chat-overlay').classList.add('hidden');
+    document.getElementById('btn-send-chat').onclick = handleChatSend;
+}
+
+// Start App
+window.addEventListener('DOMContentLoaded', init);
+
+</script>
     </body>
 </html>
